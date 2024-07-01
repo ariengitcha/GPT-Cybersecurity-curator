@@ -4,6 +4,14 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+import os
+
+# Email configuration
+email_from = os.getenv('EMAIL_USER')
+email_password = os.getenv('EMAIL_PASSWORD')
+email_to = "ariennation@gmail.com"
+email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
+email_body = ""
 
 # Define websites and categories
 websites = {
@@ -23,6 +31,7 @@ keywords = {
 
 # Function to get articles from a website
 def get_articles(url, keywords):
+    print(f"Accessing URL: {url}")
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'lxml')
 
@@ -33,6 +42,7 @@ def get_articles(url, keywords):
 
         if any(keyword.lower() in title.lower() for keyword in keywords):
             articles.append({"title": title, "url": href})
+            print(f"Found article: {title} - {href}")
 
     return articles
 
@@ -56,16 +66,6 @@ for name, url in websites.items():
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
 
-# Email setup
-import os
-
-# Retrieve email credentials from environment variables
-email_from = os.getenv('EMAIL_ADDRESS_GPT')
-email_password = os.getenv('EMAIL_PASSWORD_GPT')
-email_to = "arien.seghetti@ironbow.com"
-email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
-email_body = ""
-
 for category, articles in categorized_articles.items():
     email_body += f"\n\n{category}:\n"
     for article in articles:
@@ -79,8 +79,13 @@ msg['Subject'] = email_subject
 msg.attach(MIMEText(email_body, 'plain'))
 
 # Send email
-server = smtplib.SMTP('smtp.gmail.com', 587)
-server.starttls()
-server.login(email_from, "your-email-password")
-server.sendmail(email_from, email_to, msg.as_string())
-server.quit()
+try:
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(email_from, email_password)
+    text = msg.as_string()
+    server.sendmail(email_from, email_to, text)
+    server.quit()
+    print("Email sent successfully")
+except Exception as e:
+    print(f"Failed to send email: {e}")
