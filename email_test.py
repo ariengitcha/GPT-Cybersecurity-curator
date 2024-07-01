@@ -12,7 +12,7 @@ email_body = "This is a test email sent from a Python script."
 # Gmail SMTP server configuration
 smtp_server = "smtp.gmail.com"
 smtp_port = 587
-email_password = "your-email-password"  # Replace with your Gmail app password
+email_password = gfxj otjr cfck jotx  # Replace with your Gmail app password
 
 # Create email message
 msg = MIMEMultipart()
