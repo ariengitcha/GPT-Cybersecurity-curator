@@ -20,5 +20,5 @@ jobs:
       run: |
         python email_test.py
       env:
-        EMAIL_USER: ${{ secrets.EMAIL_USER }}
-        EMAIL_PASSWORD: ${{ secrets.GMAIL_TEST }}
+        EMAIL_ADDRESS_GPT: ${{ secrets.EMAIL_ADDRESS_GPT }}
+        EMAIL_PASSWORD_GPT: ${{ secrets.EMAIL_PASSWORD_GPT }}
