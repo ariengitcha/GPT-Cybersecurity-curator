@@ -9,7 +9,7 @@ import os
 # Email configuration
 email_from = os.getenv('EMAIL_USER')
 email_password = os.getenv('EMAIL_PASSWORD')
-email_to = "ariennation@gmail.com"
+email_to = "ariennation@gmail.com" "arien.seghetti@ironbow.com
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 email_body = ""
 
