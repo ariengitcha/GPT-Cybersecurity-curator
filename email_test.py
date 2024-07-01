@@ -1,18 +1,18 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import os
 
 # Email configuration
-email_from = "ariennation@gmail.com"
+email_from = os.getenv('EMAIL_USER')
+email_password = os.getenv('GMAIL_TEST')
 email_to = "ariennation@gmail.com"  # You can test by sending an email to yourself
-email_to = "arien.seghetti@ironbow.com" # You can test by sending an email to yourself
 email_subject = "Test Email from Python Script"
 email_body = "This is a test email sent from a Python script."
 
 # Gmail SMTP server configuration
 smtp_server = "smtp.gmail.com"
 smtp_port = 587
-email_password = gfxj otjr cfck jotx  # Replace with your Gmail app password
 
 # Create email message
 msg = MIMEMultipart()
@@ -32,3 +32,4 @@ try:
     print("Email sent successfully")
 except Exception as e:
     print(f"Failed to send email: {e}")
+
