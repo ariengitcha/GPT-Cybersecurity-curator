@@ -1,4 +1,4 @@
-nname: Email Test
+name: Email Test
 
 on:
   workflow_dispatch:
