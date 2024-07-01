@@ -1,4 +1,4 @@
-name: Email Test
+nname: Email Test
 
 on:
   workflow_dispatch:
@@ -16,14 +16,9 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install smtplib email
-
     - name: Run email test script
       run: |
         python email_test.py
       env:
         EMAIL_USER: ${{ secrets.EMAIL_USER }}
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD_GPT }}
