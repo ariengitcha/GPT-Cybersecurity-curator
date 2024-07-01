@@ -21,4 +21,4 @@ jobs:
         python email_test.py
       env:
         EMAIL_USER: ${{ secrets.EMAIL_USER }}
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD_GPT }}
+        EMAIL_PASSWORD: ${{ secrets.GMAIL_TEST }}
