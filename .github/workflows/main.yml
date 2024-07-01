@@ -8,13 +8,15 @@ on:
 jobs:
   curate-news:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true # Force usage of Node.js 20
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4 # Updated to v4 which uses Node.js 20
 
     - name: Set up Python
-      uses: actions/setup-python@v4 # Specify the latest version explicitly
+      uses: actions/setup-python@v4.7.0 # Updated to the latest version that supports Node.js 20
       with:
         python-version: '3.x'
 
