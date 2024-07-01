@@ -60,7 +60,7 @@ categorized_articles = categorize_articles(all_articles)
 import os
 
 # Retrieve email credentials from environment variables
-email_from = os.getenv('EMAIL_ADDRESS')
+email_from = os.getenv('EMAIL_ADDRESS_GPT')
 email_password = os.getenv('EMAIL_PASSWORD_GPT')
 email_to = "arien.seghetti@ironbow.com"
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
