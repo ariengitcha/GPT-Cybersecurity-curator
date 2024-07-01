@@ -27,4 +27,4 @@ jobs:
 
     - name: Run curator script
       run: |
-        python curator.py
+        python curatorgpt.py
