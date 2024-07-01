@@ -4,7 +4,7 @@ from email.mime.text import MIMEText
 import os
 
 # Email configuration
-email_from = os.getenv('EMAIL_USER')
+email_from = "ariennation@gmail.com"
 email_password = os.getenv('GMAIL_TEST')
 email_to = "ariennation@gmail.com"  # You can test by sending an email to yourself
 email_subject = "Test Email from Python Script"
