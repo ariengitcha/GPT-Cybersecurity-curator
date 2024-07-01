@@ -57,7 +57,11 @@ for name, url in websites.items():
 categorized_articles = categorize_articles(all_articles)
 
 # Email setup
-email_from = "your-email@gmail.com"
+import os
+
+# Retrieve email credentials from environment variables
+email_from = os.getenv('EMAIL_ADDRESS')
+email_password = os.getenv('EMAIL_PASSWORD_GPT')
 email_to = "arien.seghetti@ironbow.com"
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 email_body = ""
