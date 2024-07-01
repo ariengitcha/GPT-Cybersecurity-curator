@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 
 # Email configuration
@@ -32,19 +32,27 @@ keywords = {
 # Function to get articles from a website
 def get_articles(url, keywords):
     print(f"Accessing URL: {url}")
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'lxml')
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        soup = BeautifulSoup(response.content, 'lxml')
 
-    articles = []
-    for link in soup.find_all('a', href=True):
-        href = link['href']
-        title = link.get_text()
+        articles = []
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            title = link.get_text()
 
-        if any(keyword.lower() in title.lower() for keyword in keywords):
-            articles.append({"title": title, "url": href})
-            print(f"Found article: {title} - {href}")
+            if any(keyword.lower() in title.lower() for keyword in keywords):
+                # Ensure the URL is absolute
+                if not href.startswith('http'):
+                    href = url + href
+                articles.append({"title": title.strip(), "url": href})
+                print(f"Found article: {title.strip()} - {href}")
 
-    return articles
+        return articles
+    except Exception as e:
+        print(f"Failed to fetch articles from {url}: {e}")
+        return []
 
 # Function to categorize articles
 def categorize_articles(articles):
@@ -66,10 +74,15 @@ for name, url in websites.items():
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
 
+# Build email body
 for category, articles in categorized_articles.items():
     email_body += f"\n\n{category}:\n"
     for article in articles:
         email_body += f"- {article['title']} ({article['url']})\n"
+
+# Check if email body is empty
+if not email_body.strip():
+    email_body = "Nothing New today. Thanks for checking in with us."
 
 # Create email message
 msg = MIMEMultipart()
@@ -89,3 +102,4 @@ try:
     print("Email sent successfully")
 except Exception as e:
     print(f"Failed to send email: {e}")
+
