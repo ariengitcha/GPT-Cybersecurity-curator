@@ -8,6 +8,7 @@ import os
 import time
 import logging
 import sqlite3
+from urllib.parse import urljoin
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -117,10 +118,10 @@ def summarize_article(url):
     return f"Summary of {url}"
 
 # Function to get articles from a website
-def get_articles(url, keywords):
-    logging.info(f"Accessing URL: {url}")
+def get_articles(base_url, keywords):
+    logging.info(f"Accessing URL: {base_url}")
     try:
-        response = session.get(url, timeout=30)
+        response = session.get(base_url, timeout=30)
         response.raise_for_status()  # Raise an exception for HTTP errors
         soup = BeautifulSoup(response.content, 'lxml')
 
@@ -130,9 +131,8 @@ def get_articles(url, keywords):
             title = link.get_text()
 
             if any(keyword.lower() in title.lower() for keyword in keywords):
-                # Ensure the URL is absolute
-                if not href.startswith('http'):
-                    href = url + href
+                # Ensure the URL is absolute using urljoin
+                href = urljoin(base_url, href)
                 if is_valid_url(href):
                     summary = summarize_article(href)
                     articles.append({"title": title.strip(), "url": href, "summary": summary})
@@ -140,7 +140,7 @@ def get_articles(url, keywords):
 
         return articles
     except Exception as e:
-        logging.error(f"Failed to fetch articles from {url}: {e}")
+        logging.error(f"Failed to fetch articles from {base_url}: {e}")
         return []
 
 # Function to categorize articles
