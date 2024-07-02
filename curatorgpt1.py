@@ -38,6 +38,15 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
+# Example images for categories
+category_images = {
+    "Breach": "https://example.com/breach_image.jpg",
+    "Vulnerability": "https://example.com/vulnerability_image.jpg",
+    "Compliance": "https://example.com/compliance_image.jpg",
+    "Startup": "https://example.com/startup_image.jpg",
+    "AI": "https://example.com/ai_image.jpg"
+}
+
 # Create or connect to a SQLite database
 conn = sqlite3.connect('articles.db')
 c = conn.cursor()
@@ -158,17 +167,46 @@ for name, url in websites.items():
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
 
-# Build HTML email body
-email_body = ""
+# Build HTML email body with styles and images
+email_body = """
+<html>
+<head>
+<style>
+    body {font-family: Arial, sans-serif; line-height: 1.6;}
+    h2 {color: #2E8B57;}
+    ul {list-style-type: none; padding: 0;}
+    li {margin: 10px 0;}
+    a {text-decoration: none; color: #1E90FF;}
+    a:hover {text-decoration: underline;}
+    .summary {font-size: 0.9em; color: #555;}
+    .category {margin-top: 20px;}
+    .category img {width: 100px; height: auto; float: left; margin-right: 20px;}
+</style>
+</head>
+<body>
+<h1>Daily Cybersecurity News</h1>
+"""
+
 for category, articles in categorized_articles.items():
-    email_body += f"<h2>{category}</h2><ul>"
+    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><br>{article['summary']}</li>"
-    email_body += "</ul>"
+        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+    email_body += "</ul></div>"
+
+email_body += """
+</body>
+</html>
+"""
 
 # Check if email body is empty
 if not email_body.strip():
-    email_body = "<p>Nothing New today. Thanks for checking in with us.</p>"
+    email_body = """
+    <html>
+    <body>
+    <p>Nothing New today. Thanks for checking in with us.</p>
+    </body>
+    </html>
+    """
 
 # Create email message
 msg = MIMEMultipart()
