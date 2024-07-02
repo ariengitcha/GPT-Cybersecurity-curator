@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import time
 
@@ -30,6 +30,15 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
+# Determine the date range for the search
+def get_date_range():
+    today = datetime.now()
+    if today.weekday() == 0:  # Monday
+        start_date = today - timedelta(days=3)  # From Friday
+    else:
+        start_date = today - timedelta(days=1)  # Past 24 hours
+    return start_date, today
+
 # Function to check if a website is up and running
 def is_website_up(url):
     try:
@@ -45,7 +54,7 @@ def is_website_up(url):
         return False
 
 # Function to get articles from a website
-def get_articles(url, keywords):
+def get_articles(url, keywords, start_date, end_date):
     print(f"Accessing URL: {url}")
     try:
         response = requests.get(url, timeout=30)
@@ -57,6 +66,7 @@ def get_articles(url, keywords):
             href = link['href']
             title = link.get_text()
 
+            # Filter articles by keywords and date
             if any(keyword.lower() in title.lower() for keyword in keywords):
                 # Ensure the URL is absolute
                 if not href.startswith('http'):
@@ -81,11 +91,12 @@ def categorize_articles(articles):
     return categorized
 
 # Collect articles
+start_date, end_date = get_date_range()
 all_articles = []
 for name, url in websites.items():
     if is_website_up(url):
         time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []))
+        articles = get_articles(url, sum(keywords.values(), []), start_date, end_date)
         all_articles.extend(articles)
 
 # Categorize articles
