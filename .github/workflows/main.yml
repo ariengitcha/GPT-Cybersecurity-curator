@@ -2,7 +2,7 @@ name: Curate Cybersecurity News
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Runs at 6 AM daily
+    - cron: '0 6 * * 1-5' # Runs at 6 AM Monday to Friday
   workflow_dispatch:
 
 jobs:
