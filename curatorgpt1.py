@@ -90,6 +90,18 @@ def is_website_up(url):
         logging.error(f"Website {url} is not reachable. Error: {e}")
         return False
 
+# Function to check if a URL returns a 404 error
+def is_valid_url(url):
+    try:
+        response = session.head(url, timeout=30)
+        if response.status_code == 404:
+            logging.warning(f"URL {url} returned a 404 error.")
+            return False
+        return True
+    except requests.RequestException as e:
+        logging.error(f"Failed to check URL {url}: {e}")
+        return False
+
 # Example function to summarize an article
 def summarize_article(url):
     # Simulate a summarization process (replace with actual API call if available)
@@ -112,9 +124,10 @@ def get_articles(url, keywords):
                 # Ensure the URL is absolute
                 if not href.startswith('http'):
                     href = url + href
-                summary = summarize_article(href)
-                articles.append({"title": title.strip(), "url": href, "summary": summary})
-                logging.info(f"Found article: {title.strip()} - {href} - {summary}")
+                if is_valid_url(href):
+                    summary = summarize_article(href)
+                    articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
 
         return articles
     except Exception as e:
@@ -178,3 +191,4 @@ except Exception as e:
 
 # Close the database connection
 conn.close()
+
