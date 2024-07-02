@@ -118,7 +118,7 @@ def summarize_article(url):
     return f"Summary of {url}"
 
 # Function to get articles from a website
-def get_articles(base_url, keywords):
+def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
     try:
         response = session.get(base_url, timeout=30)
@@ -130,12 +130,13 @@ def get_articles(base_url, keywords):
             href = link['href']
             title = link.get_text()
 
-            if any(keyword.lower() in title.lower() for keyword in keywords):
-                # Ensure the URL is absolute using urljoin
-                href = urljoin(base_url, href)
+            # Ensure the URL is absolute using urljoin
+            href = urljoin(base_url, href)
+            if href not in processed_urls and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
                     summary = summarize_article(href)
                     articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    processed_urls.add(href)
                     logging.info(f"Found article: {title.strip()} - {href} - {summary}")
 
         return articles
@@ -158,10 +159,12 @@ def categorize_articles(articles):
 # Collect articles
 start_date, end_date = get_date_range()
 all_articles = []
+processed_urls = set()
+
 for name, url in websites.items():
     if is_website_up(url):
         time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []))
+        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
         all_articles.extend(articles)
 
 # Categorize articles
