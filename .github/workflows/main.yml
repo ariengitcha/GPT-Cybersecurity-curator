@@ -22,7 +22,7 @@ jobs:
 
     - name: Run curator script
       run: |
-        python curatorgpt.py
+        python curatorgpt1.py
       env:
         EMAIL_ADDRESS_GPT: ${{ secrets.EMAIL_ADDRESS_GPT }}
         EMAIL_PASSWORD_GPT: ${{ secrets.EMAIL_PASSWORD_GPT }}
