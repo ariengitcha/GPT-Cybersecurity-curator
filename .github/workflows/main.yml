@@ -1,4 +1,4 @@
-nname: Curate Cybersecurity News
+name: Curate Cybersecurity News
 
 on:
   schedule:
