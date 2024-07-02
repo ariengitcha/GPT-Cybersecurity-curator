@@ -5,11 +5,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 import os
+import time
 
 # Email configuration
-email_from = os.getenv('EMAIL_USER')
-email_password = os.getenv('EMAIL_PASSWORD')
-email_to = "ariennation@gmail.com" "arien.seghetti@ironbow.com
+email_from = os.getenv('EMAIL_ADDRESS_GPT')
+email_password = os.getenv('EMAIL_PASSWORD_GPT')
+email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 email_body = ""
 
@@ -29,11 +30,25 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
+# Function to check if a website is up and running
+def is_website_up(url):
+    try:
+        response = requests.head(url, timeout=30)
+        if response.status_code == 200:
+            print(f"Website {url} is up and running.")
+            return True
+        else:
+            print(f"Website {url} returned status code: {response.status_code}")
+            return False
+    except requests.RequestException as e:
+        print(f"Website {url} is not reachable. Error: {e}")
+        return False
+
 # Function to get articles from a website
 def get_articles(url, keywords):
     print(f"Accessing URL: {url}")
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()  # Raise an exception for HTTP errors
         soup = BeautifulSoup(response.content, 'lxml')
 
@@ -68,8 +83,10 @@ def categorize_articles(articles):
 # Collect articles
 all_articles = []
 for name, url in websites.items():
-    articles = get_articles(url, sum(keywords.values(), []))
-    all_articles.extend(articles)
+    if is_website_up(url):
+        time.sleep(30)  # Wait for 30 seconds before processing each website
+        articles = get_articles(url, sum(keywords.values(), []))
+        all_articles.extend(articles)
 
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
@@ -87,7 +104,7 @@ if not email_body.strip():
 # Create email message
 msg = MIMEMultipart()
 msg['From'] = email_from
-msg['To'] = email_to
+msg['To'] = ", ".join(email_to)
 msg['Subject'] = email_subject
 msg.attach(MIMEText(email_body, 'plain'))
 
@@ -102,4 +119,3 @@ try:
     print("Email sent successfully")
 except Exception as e:
     print(f"Failed to send email: {e}")
-
