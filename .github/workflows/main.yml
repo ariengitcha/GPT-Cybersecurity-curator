@@ -13,18 +13,16 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4 # Updated to v4 which uses Node.js 20
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4 # Updated to the latest version that supports Node.js 20
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 lxml
 
     - name: Run curator script
       run: |
         python curatorgpt.py
+      env:
+        EMAIL_ADDRESS_GPT: ${{ secrets.EMAIL_ADDRESS_GPT }}
+        EMAIL_PASSWORD_GPT: ${{ secrets.EMAIL_PASSWORD_GPT }}
