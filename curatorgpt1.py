@@ -6,6 +6,14 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import os
 import time
+import logging
+import sqlite3
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+# Setup logging
+logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
+                    format='%(asctime)s %(levelname)s:%(message)s')
 
 # Email configuration
 email_from = os.getenv('EMAIL_ADDRESS_GPT')
@@ -30,6 +38,35 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
+# Create or connect to a SQLite database
+conn = sqlite3.connect('articles.db')
+c = conn.cursor()
+
+# Create table
+c.execute('''CREATE TABLE IF NOT EXISTS articles
+             (date text, category text, title text, url text)''')
+
+# Insert a row of data
+def log_article(category, title, url):
+    c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
+              (datetime.now().strftime('%Y-%m-%d'), category, title, url))
+    conn.commit()
+
+# Get a requests session with retries
+def get_session():
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504]
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+session = get_session()
+
 # Determine the date range for the search
 def get_date_range():
     today = datetime.now()
@@ -44,20 +81,25 @@ def is_website_up(url):
     try:
         response = requests.head(url, timeout=30)
         if response.status_code == 200:
-            print(f"Website {url} is up and running.")
+            logging.info(f"Website {url} is up and running.")
             return True
         else:
-            print(f"Website {url} returned status code: {response.status_code}")
+            logging.warning(f"Website {url} returned status code: {response.status_code}")
             return False
     except requests.RequestException as e:
-        print(f"Website {url} is not reachable. Error: {e}")
+        logging.error(f"Website {url} is not reachable. Error: {e}")
         return False
 
+# Example function to summarize an article
+def summarize_article(url):
+    # Simulate a summarization process (replace with actual API call if available)
+    return f"Summary of {url}"
+
 # Function to get articles from a website
-def get_articles(url, keywords, start_date, end_date):
-    print(f"Accessing URL: {url}")
+def get_articles(url, keywords):
+    logging.info(f"Accessing URL: {url}")
     try:
-        response = requests.get(url, timeout=30)
+        response = session.get(url, timeout=30)
         response.raise_for_status()  # Raise an exception for HTTP errors
         soup = BeautifulSoup(response.content, 'lxml')
 
@@ -66,17 +108,17 @@ def get_articles(url, keywords, start_date, end_date):
             href = link['href']
             title = link.get_text()
 
-            # Filter articles by keywords and date
             if any(keyword.lower() in title.lower() for keyword in keywords):
                 # Ensure the URL is absolute
                 if not href.startswith('http'):
                     href = url + href
-                articles.append({"title": title.strip(), "url": href})
-                print(f"Found article: {title.strip()} - {href}")
+                summary = summarize_article(href)
+                articles.append({"title": title.strip(), "url": href, "summary": summary})
+                logging.info(f"Found article: {title.strip()} - {href} - {summary}")
 
         return articles
     except Exception as e:
-        print(f"Failed to fetch articles from {url}: {e}")
+        logging.error(f"Failed to fetch articles from {url}: {e}")
         return []
 
 # Function to categorize articles
@@ -87,6 +129,7 @@ def categorize_articles(articles):
         for category, kw_list in keywords.items():
             if any(kw.lower() in article['title'].lower() for kw in kw_list):
                 categorized[category].append(article)
+                log_article(category, article['title'], article['url'])
 
     return categorized
 
@@ -96,28 +139,30 @@ all_articles = []
 for name, url in websites.items():
     if is_website_up(url):
         time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []), start_date, end_date)
+        articles = get_articles(url, sum(keywords.values(), []))
         all_articles.extend(articles)
 
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
 
-# Build email body
+# Build HTML email body
+email_body = ""
 for category, articles in categorized_articles.items():
-    email_body += f"\n\n{category}:\n"
+    email_body += f"<h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"- {article['title']} ({article['url']})\n"
+        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><br>{article['summary']}</li>"
+    email_body += "</ul>"
 
 # Check if email body is empty
 if not email_body.strip():
-    email_body = "Nothing New today. Thanks for checking in with us."
+    email_body = "<p>Nothing New today. Thanks for checking in with us.</p>"
 
 # Create email message
 msg = MIMEMultipart()
 msg['From'] = email_from
 msg['To'] = ", ".join(email_to)
 msg['Subject'] = email_subject
-msg.attach(MIMEText(email_body, 'plain'))
+msg.attach(MIMEText(email_body, 'html'))
 
 # Send email
 try:
@@ -127,6 +172,9 @@ try:
     text = msg.as_string()
     server.sendmail(email_from, email_to, text)
     server.quit()
-    print("Email sent successfully")
+    logging.info("Email sent successfully")
 except Exception as e:
-    print(f"Failed to send email: {e}")
+    logging.error(f"Failed to send email: {e}")
+
+# Close the database connection
+conn.close()
