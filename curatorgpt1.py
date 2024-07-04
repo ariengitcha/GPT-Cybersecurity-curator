@@ -1,4 +1,3 @@
-
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
@@ -10,8 +9,6 @@ import os
 import logging
 import sqlite3
 from urllib.parse import urljoin
-import aiodns
-import chardet
 from aiohttp_retry import RetryClient, ExponentialRetry
 
 # Setup logging
@@ -36,7 +33,7 @@ keywords = {
     "Breach": ["breach", "data breach"],
     "Vulnerability": ["vulnerability", "exploit"],
     "Compliance": ["compliance", "regulation"],
-    "Startup": "startup, funding",
+    "Startup": ["startup", "funding"],
     "AI": ["AI", "artificial intelligence"]
 }
 
@@ -224,5 +221,3 @@ async def main():
 # Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
-```
-
