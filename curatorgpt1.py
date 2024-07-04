@@ -1,6 +1,4 @@
-Certainly! I'll rewrite the code incorporating the suggestions. Here's the updated version:
 
-```python
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
