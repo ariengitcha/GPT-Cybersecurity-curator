@@ -228,25 +228,3 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-This updated version includes the following improvements:
-
-1. Asynchronous operations using `aiohttp` and `asyncio` for better performance.
-2. More robust error handling and retries using `aiohttp_retry`.
-3. Improved database operations using context managers.
-4. Enhanced date parsing to handle various date formats.
-5. Placeholder for article summarization (you'll need to implement or integrate with an actual summarization API).
-6. More flexible article categorization.
-7. Improved HTML email template.
-8. Better separation of concerns with functions for different operations.
-
-To use this script, you'll need to install additional dependencies:
-
-```
-pip install aiohttp aiodns chardet aiohttp_retry
-```
-
-Remember to replace the placeholder image URLs in the `category_images` dictionary with actual URLs.
-
-Also, note that this script uses Gmail's SMTP server. If you're using Google Workspace or if you encounter authentication issues, you might need to use OAuth2 instead of username/password authentication.
-
-Lastly, make sure to implement proper rate limiting and respect the websites' robots.txt files and terms of service when scraping content.
