@@ -87,16 +87,22 @@ async def fetch_url(session, url):
 async def process_article(session, base_url, link, keywords, start_date):
     href = urljoin(base_url, link['href'])
     title = link.get_text().strip()
+    logging.debug(f"Processing article: {title} - {href}")
 
     if any(keyword.lower() in title.lower() for keyword in keywords):
         html = await fetch_url(session, href)
         if html:
             soup = BeautifulSoup(html, 'lxml')
             pub_date = get_publication_date(soup)
-            
+            logging.debug(f"Publication date for {title}: {pub_date}")
+
             if pub_date and pub_date >= start_date:
                 summary = await summarize_article(session, href)
                 return {"title": title, "url": href, "summary": summary}
+            else:
+                logging.debug(f"Article {title} is older than {start_date}")
+        else:
+            logging.debug(f"Failed to fetch content for article {title}")
     return None
 
 async def get_articles(session, base_url, keywords, start_date):
