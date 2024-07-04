@@ -38,11 +38,11 @@ keywords = {
 }
 
 category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
-    "Vulnerability": "https://example.com/vulnerability_image.jpg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
+    "Breach": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
+    "Vulnerability": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
+    "Compliance": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
+    "Startup": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
+    "AI": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png"
 }
 
 # Database operations
@@ -214,16 +214,3 @@ async def main():
         tasks = []
         for name, url in websites.items():
             task = get_articles(session, url, sum(keywords.values(), []), start_date)
-            tasks.append(task)
-
-        results = await asyncio.gather(*tasks)
-        for articles in results:
-            all_articles.extend(articles)
-
-    categorized_articles = categorize_articles(all_articles)
-    email_body = build_email_body(categorized_articles)
-    send_email(email_body)
-
-# Run the main function
-if __name__ == "__main__":
-    asyncio.run(main())
