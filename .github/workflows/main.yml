@@ -16,4 +16,15 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 lxml aiodns aiohttp aiohttp_retry
+
+    - name: Run curator script
+      run: python curatorgpt1.py
+      env:
+        EMAIL_ADDRESS_GPT: ${{ secrets.EMAIL_ADDRESS_GPT }}
+        EMAIL_PASSWORD_GPT: ${{ secrets.EMAIL_PASSWORD_GPT }}
