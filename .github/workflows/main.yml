@@ -3,6 +3,7 @@ name: Curate News
 on:
   schedule:
     - cron: '0 9 * * 1-5'
+  workflow_dispatch: # This allows manual triggering of the workflow
 
 jobs:
   curate-news:
