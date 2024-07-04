@@ -178,43 +178,4 @@ def build_email_body(categorized_articles):
     return email_body if any(categorized_articles.values()) else "<p>No new articles today. Thanks for checking in with us.</p>"
 
 # Send email
-def send_email(email_body):
-    msg = MIMEMultipart()
-    msg['From'] = email_from
-    msg['To'] = ", ".join(email_to)
-    msg['Subject'] = email_subject
-    msg.attach(MIMEText(email_body, 'html'))
-
-    try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(email_from, email_password)
-            server.sendmail(email_from, email_to, msg.as_string())
-        logging.info("Email sent successfully")
-    except Exception as e:
-        logging.error(f"Failed to send email: {e}")
-
-# Main asynchronous function
-async def main():
-    init_db()
-    start_date, end_date = get_date_range()
-    all_articles = []
-
-    retry_options = ExponentialRetry(attempts=5)
-    async with RetryClient(retry_options=retry_options) as session:
-        tasks = []
-        for name, url in websites.items():
-            task = get_articles(session, url, sum(keywords.values(), []), start_date)
-            tasks.append(task)
-
-        results = await asyncio.gather(*tasks)
-        for articles in results:
-            all_articles.extend(articles)
-
-    categorized_articles = categorize_articles(all_articles)
-    email_body = build_email_body(categorized_articles)
-    send_email(email_body)
-
-# Run the main function
-if __name__ == "__main__":
-    asyncio.run(main())
+def send_em
