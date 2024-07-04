@@ -6,8 +6,6 @@ on:
 jobs:
   curate-news:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -18,7 +16,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 lxml aiohttp aiodns cchardet aiohttp_retry
+        pip install requests beautifulsoup4 lxml aiohttp aiodns chardet aiohttp_retry
     - name: Run curator script
       run: |
         python curatorgpt1.py
