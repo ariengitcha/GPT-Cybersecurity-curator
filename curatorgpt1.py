@@ -37,14 +37,6 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
-category_images = {
-    "Breach": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
-    "Vulnerability": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
-    "Compliance": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
-    "Startup": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png",
-    "AI": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/651048e217480b3f01bad57836a5d347942893aa/images/download-ib.png"
-}
-
 # Database operations
 def get_db_connection():
     return sqlite3.connect('articles.db')
@@ -166,7 +158,6 @@ def build_email_body(categorized_articles):
         a:hover {text-decoration: underline;}
         .summary {font-size: 0.9em; color: #555;}
         .category {margin-top: 20px;}
-        .category img {width: 100px; height: auto; float: left; margin-right: 20px;}
     </style>
     </head>
     <body>
@@ -174,7 +165,7 @@ def build_email_body(categorized_articles):
     """
 
     for category, articles in categorized_articles.items():
-        email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
+        email_body += f"<div class='category'><h2>{category}</h2><ul>"
         for article in articles:
             email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
         email_body += "</ul></div>"
@@ -214,3 +205,16 @@ async def main():
         tasks = []
         for name, url in websites.items():
             task = get_articles(session, url, sum(keywords.values(), []), start_date)
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks)
+        for articles in results:
+            all_articles.extend(articles)
+
+    categorized_articles = categorize_articles(all_articles)
+    email_body = build_email_body(categorized_articles)
+    send_email(email_body)
+
+# Run the main function
+if __name__ == "__main__":
+    asyncio.run(main())
