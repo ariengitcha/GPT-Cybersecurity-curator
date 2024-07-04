@@ -117,21 +117,8 @@ def summarize_article(url):
     # Simulate a summarization process (replace with actual API call if available)
     return f"Summary of {url}"
 
-# Function to get the publication date from an article
-def get_publication_date(soup):
-    # This function needs to be tailored for each website's structure
-    date = None
-    # Example for generic date patterns, may need adjustment for specific websites
-    date_tag = soup.find('time')
-    if date_tag:
-        try:
-            date = datetime.strptime(date_tag['datetime'], '%Y-%m-%dT%H:%M:%SZ')
-        except Exception:
-            date = None
-    return date
-
 # Function to get articles from a website
-def get_articles(base_url, keywords, processed_urls, start_date):
+def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
     try:
         response = session.get(base_url, timeout=30)
@@ -147,16 +134,10 @@ def get_articles(base_url, keywords, processed_urls, start_date):
             href = urljoin(base_url, href)
             if href not in processed_urls and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    article_response = session.get(href, timeout=30)
-                    article_response.raise_for_status()
-                    article_soup = BeautifulSoup(article_response.content, 'lxml')
-                    pub_date = get_publication_date(article_soup)
-                    
-                    if pub_date and pub_date >= start_date:
-                        summary = summarize_article(href)
-                        articles.append({"title": title.strip(), "url": href, "summary": summary})
-                        processed_urls.add(href)
-                        logging.info(f"Found article: {title.strip()} - {href} - {summary}")
+                    summary = summarize_article(href)
+                    articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    processed_urls.add(href)
+                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
 
         return articles
     except Exception as e:
@@ -183,7 +164,7 @@ processed_urls = set()
 for name, url in websites.items():
     if is_website_up(url):
         time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []), processed_urls, start_date)
+        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
         all_articles.extend(articles)
 
 # Categorize articles
