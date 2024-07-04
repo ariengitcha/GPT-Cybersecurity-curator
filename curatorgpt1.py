@@ -13,7 +13,7 @@ import logging
 import sqlite3
 from urllib.parse import urljoin
 import aiodns
-import cchardet
+import chardet
 from aiohttp_retry import RetryClient, ExponentialRetry
 
 # Setup logging
@@ -242,7 +242,7 @@ This updated version includes the following improvements:
 To use this script, you'll need to install additional dependencies:
 
 ```
-pip install aiohttp aiodns cchardet aiohttp_retry
+pip install aiohttp aiodns chardet aiohttp_retry
 ```
 
 Remember to replace the placeholder image URLs in the `category_images` dictionary with actual URLs.
