@@ -90,14 +90,12 @@ def get_session():
 
 session = get_session()
 
-# Determine the date range for the search
+# Determine the date range for the search (previous day)
 def get_date_range():
-    today = datetime.now()
-    if today.weekday() == 0:  # Monday
-        start_date = today - timedelta(days=3)  # From Friday
-    else:
-        start_date = today - timedelta(days=1)  # Past 24 hours
-    return start_date, today
+    yesterday = datetime.now() - timedelta(days=1)
+    start_date = datetime(yesterday.year, yesterday.month, yesterday.day)
+    end_date = start_date + timedelta(days=1)
+    return start_date, end_date
 
 # Function to check if a website is up and running
 def is_website_up(url):
@@ -238,6 +236,7 @@ for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
         email_body += f"<li><a href='{article['url']}'>{article['title']}</a></li>"
+        email_body += "<hr>"
     email_body += "</ul></div>"
 
 email_body += """
