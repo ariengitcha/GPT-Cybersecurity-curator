@@ -41,7 +41,7 @@ keywords = {
 
 # Example images for categories
 category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
+    "Breach": images/CyberTyger1.jpeg
     "Vulnerability": "https://example.com/vulnerability_image.jpg",
     "Compliance": "https://example.com/compliance_image.jpg",
     "Startup": "https://example.com/startup_image.jpg",
