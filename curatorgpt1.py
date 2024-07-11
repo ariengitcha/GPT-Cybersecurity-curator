@@ -1,3 +1,8 @@
+Sure, I will create lists to exclude these URLs from being curated into the daily email and update the script to filter out these URLs during the article extraction process.
+
+Here is the updated script with the exclusion logic:
+
+```python
 import requests
 from bs4 import BeautifulSoup
 import smtplib
@@ -47,6 +52,19 @@ category_images = {
     "Startup": "https://example.com/startup_image.jpg",
     "AI": "https://example.com/ai_image.jpg"
 }
+
+# URLs to exclude
+excluded_urls = [
+    "https://krebsonsecurity.com/category/",
+    "https://krebsonsecurity.com/category/*",
+    "*/author/*",
+    "https://www.csoonline.com/compliance/",
+    "https://www.csoonline.com/compliance/*",
+    "https://www.darkreading.com/program/*",
+    "https://thehackernews.com/#email-outer",
+    "https://www.csoonline.com/artificial-intelligence/",
+    "https://www.csoonline.com/generative-ai/"
+]
 
 # Create or connect to a SQLite database
 conn = sqlite3.connect('articles.db')
@@ -117,6 +135,17 @@ def summarize_article(url):
     # Simulate a summarization process (replace with actual API call if available)
     return f"Summary of {url}"
 
+# Function to check if a URL should be excluded
+def is_excluded_url(url):
+    for excluded in excluded_urls:
+        if '*' in excluded:
+            excluded_pattern = excluded.replace('*', '')
+            if excluded_pattern in url:
+                return True
+        elif url.startswith(excluded):
+            return True
+    return False
+
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
@@ -132,7 +161,7 @@ def get_articles(base_url, keywords, processed_urls):
 
             # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
-            if href not in processed_urls and any(keyword.lower() in title.lower() for keyword in keywords):
+            if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
                     summary = summarize_article(href)
                     articles.append({"title": title.strip(), "url": href, "summary": summary})
@@ -175,15 +204,42 @@ email_body = """
 <html>
 <head>
 <style>
-    body {font-family: Arial, sans-serif; line-height: 1.6;}
-    h2 {color: #2E8B57;}
-    ul {list-style-type: none; padding: 0;}
-    li {margin: 10px 0;}
-    a {text-decoration: none; color: #1E90FF;}
-    a:hover {text-decoration: underline;}
-    .summary {font-size: 0.9em; color: #555;}
-    .category {margin-top: 20px;}
-    .category img {width: 100px; height: auto; float: left; margin-right: 20px;}
+    body {
+        font-family: Arial, sans-serif; 
+        line-height: 1.6;
+        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
+        background-size: cover;  /* Ensure the image covers the entire background */
+    }
+    h2 {
+        color: #2E8B57;
+    }
+    ul {
+        list-style-type: none; 
+        padding: 0;
+    }
+    li {
+        margin: 10px 0;
+    }
+    a {
+        text-decoration: none; 
+        color: #1E90FF;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+    .summary {
+        font-size: 0.9em; 
+        color: #555;
+    }
+    .category {
+        margin-top: 20px;
+    }
+    .category img {
+        width: 100px; 
+        height: auto; 
+        float: left; 
+        margin-right: 20px;
+    }
 </style>
 </head>
 <body>
@@ -202,11 +258,11 @@ email_body += """
 """
 
 # Check if email body is empty
-if not email_body.strip():
+if not any(categorized_articles.values()):
     email_body = """
     <html>
     <body>
-    <p>Nothing New today. Thanks for checking in with us.</p>
+    <p>Nothing new today. Thanks for checking in with us.</p>
     </body>
     </html>
     """
@@ -215,20 +271,4 @@ if not email_body.strip():
 msg = MIMEMultipart()
 msg['From'] = email_from
 msg['To'] = ", ".join(email_to)
-msg['Subject'] = email_subject
-msg.attach(MIMEText(email_body, 'html'))
-
-# Send email
-try:
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(email_from, email_password)
-    text = msg.as_string()
-    server.sendmail(email_from, email_to, text)
-    server.quit()
-    logging.info("Email sent successfully")
-except Exception as e:
-    logging.error(f"Failed to send email: {e}")
-
-# Close the database connection
-conn.close()
+msg['Subject']
