@@ -175,15 +175,42 @@ email_body = """
 <html>
 <head>
 <style>
-    body {font-family: Arial, sans-serif; line-height: 1.6;}
-    h2 {color: #2E8B57;}
-    ul {list-style-type: none; padding: 0;}
-    li {margin: 10px 0;}
-    a {text-decoration: none; color: #1E90FF;}
-    a:hover {text-decoration: underline;}
-    .summary {font-size: 0.9em; color: #555;}
-    .category {margin-top: 20px;}
-    .category img {width: 100px; height: auto; float: left; margin-right: 20px;}
+    body {
+        font-family: Arial, sans-serif; 
+        line-height: 1.6;
+        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
+        background-size: cover;  /* Ensure the image covers the entire background */
+    }
+    h2 {
+        color: #2E8B57;
+    }
+    ul {
+        list-style-type: none; 
+        padding: 0;
+    }
+    li {
+        margin: 10px 0;
+    }
+    a {
+        text-decoration: none; 
+        color: #1E90FF;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+    .summary {
+        font-size: 0.9em; 
+        color: #555;
+    }
+    .category {
+        margin-top: 20px;
+    }
+    .category img {
+        width: 100px; 
+        height: auto; 
+        float: left; 
+        margin-right: 20px;
+    }
 </style>
 </head>
 <body>
@@ -202,11 +229,11 @@ email_body += """
 """
 
 # Check if email body is empty
-if not email_body.strip():
+if not any(categorized_articles.values()):
     email_body = """
     <html>
     <body>
-    <p>Nothing New today. Thanks for checking in with us.</p>
+    <p>Nothing new today. Thanks for checking in with us.</p>
     </body>
     </html>
     """
