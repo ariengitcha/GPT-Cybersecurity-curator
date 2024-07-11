@@ -125,6 +125,7 @@ def extract_date(soup):
             if date_element:
                 date_text = date_element.get(attr) or date_element.text
                 try:
+                    logging.info(f"Found date {date_text.strip()} in tag {tag} with attribute {attr}")
                     return datetime.strptime(date_text.strip(), '%Y-%m-%d')
                 except ValueError:
                     try:
@@ -153,6 +154,11 @@ def get_articles(base_url, keywords, processed_urls):
                     article_response = session.get(href)
                     article_soup = BeautifulSoup(article_response.content, 'lxml')
                     article_date = extract_date(article_soup)
+
+                    if article_date:
+                        logging.info(f"Article date: {article_date}")
+                    else:
+                        logging.info("No date found for article")
 
                     if article_date and start_date <= article_date < end_date:
                         articles.append({"title": title.strip(), "url": href})
