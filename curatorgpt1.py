@@ -114,25 +114,21 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Function to extract date from article
-def extract_date(soup):
-    # Try different common date formats and tags
-    date_tags = ['time', 'span', 'p', 'div']
-    date_attributes = ['datetime', 'data-date', 'date', 'content']
-    for tag in date_tags:
-        for attr in date_attributes:
-            date_element = soup.find(tag, {attr: True})
-            if date_element:
-                date_text = date_element.get(attr) or date_element.text
-                try:
-                    logging.info(f"Found date {date_text.strip()} in tag {tag} with attribute {attr}")
-                    return datetime.strptime(date_text.strip(), '%Y-%m-%d')
-                except ValueError:
-                    try:
-                        return datetime.strptime(date_text.strip(), '%B %d, %Y')
-                    except ValueError:
-                        continue
-    return None
+# Example function to summarize an article
+def summarize_article(url):
+    # Simulate a summarization process (replace with actual API call if available)
+    return f"Summary of {url}"
+
+# Function to check if a URL should be excluded
+def is_excluded_url(url):
+    for excluded in excluded_urls:
+        if '*' in excluded:
+            excluded_pattern = excluded.replace('*', '')
+            if excluded_pattern in url:
+                return True
+        elif url.startswith(excluded):
+            return True
+    return False
 
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
@@ -151,21 +147,9 @@ def get_articles(base_url, keywords, processed_urls):
             href = urljoin(base_url, href)
             if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    article_response = session.get(href)
-                    article_soup = BeautifulSoup(article_response.content, 'lxml')
-                    article_date = extract_date(article_soup)
-
-                    if article_date:
-                        logging.info(f"Article date: {article_date}")
-                    else:
-                        logging.info("No date found for article")
-
-                    if article_date and start_date <= article_date < end_date:
-                        articles.append({"title": title.strip(), "url": href})
-                        processed_urls.add(href)
-                        logging.info(f"Found article: {title.strip()} - {href}")
-                    else:
-                        logging.info(f"Article date {article_date} is not within the range {start_date} to {end_date}")
+                    articles.append({"title": title.strip(), "url": href})
+                    processed_urls.add(href)
+                    logging.info(f"Found article: {title.strip()} - {href}")
 
         return articles
     except Exception as e:
@@ -186,8 +170,6 @@ def categorize_articles(articles):
 
 # Collect articles
 start_date, end_date = get_date_range()
-logging.info(f"Date range for article collection: {start_date} to {end_date}")
-
 all_articles = []
 processed_urls = set()
 
@@ -196,8 +178,6 @@ for name, url in websites.items():
         time.sleep(30)  # Wait for 30 seconds before processing each website
         articles = get_articles(url, sum(keywords.values(), []), processed_urls)
         all_articles.extend(articles)
-
-logging.info(f"Total articles found: {len(all_articles)}")
 
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
@@ -230,11 +210,6 @@ email_body = """
     }
     .category {
         margin-top: 20px;
-    }
-    hr {
-        border: none;
-        border-top: 1px solid #ccc;
-        margin: 20px 0;
     }
 </style>
 </head>
@@ -273,7 +248,10 @@ msg.attach(MIMEText(email_body, 'html'))
 
 # Debug logs before sending the email
 logging.info("Preparing to send email with the following content:")
-logging.info(email_body)
+logging.info(f"From: {email_from}")
+logging.info(f"To: {email_to}")
+logging.info(f"Subject: {email_subject}")
+logging.info(f"Body: {email_body}")
 
 # Send email
 try:
