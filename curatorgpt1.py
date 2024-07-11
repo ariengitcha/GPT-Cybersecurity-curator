@@ -114,21 +114,24 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Example function to summarize an article
-def summarize_article(url):
-    # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
-
-# Function to check if a URL should be excluded
-def is_excluded_url(url):
-    for excluded in excluded_urls:
-        if '*' in excluded:
-            excluded_pattern = excluded.replace('*', '')
-            if excluded_pattern in url:
-                return True
-        elif url.startswith(excluded):
-            return True
-    return False
+# Function to extract date from article
+def extract_date(soup):
+    # Try different common date formats and tags
+    date_tags = ['time', 'span', 'p', 'div']
+    date_attributes = ['datetime', 'data-date', 'date', 'content']
+    for tag in date_tags:
+        for attr in date_attributes:
+            date_element = soup.find(tag, {attr: True})
+            if date_element:
+                date_text = date_element.get(attr) or date_element.text
+                try:
+                    return datetime.strptime(date_text.strip(), '%Y-%m-%d')
+                except ValueError:
+                    try:
+                        return datetime.strptime(date_text.strip(), '%B %d, %Y')
+                    except ValueError:
+                        continue
+    return None
 
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
@@ -147,9 +150,14 @@ def get_articles(base_url, keywords, processed_urls):
             href = urljoin(base_url, href)
             if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    articles.append({"title": title.strip(), "url": href})
-                    processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href}")
+                    article_response = session.get(href)
+                    article_soup = BeautifulSoup(article_response.content, 'lxml')
+                    article_date = extract_date(article_soup)
+
+                    if article_date and start_date <= article_date < end_date:
+                        articles.append({"title": title.strip(), "url": href})
+                        processed_urls.add(href)
+                        logging.info(f"Found article: {title.strip()} - {href}")
 
         return articles
     except Exception as e:
