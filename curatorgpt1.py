@@ -103,7 +103,7 @@ def get_date_range():
 def is_website_up(url):
     try:
         response = requests.head(url, timeout=30)
-        if response.status_code == 200):
+        if response.status_code == 200:
             logging.info(f"Website {url} is up and running.")
             return True
         else:
