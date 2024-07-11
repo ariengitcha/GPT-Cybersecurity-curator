@@ -202,11 +202,11 @@ email_body += """
 """
 
 # Check if email body is empty
-if not email_body.strip():
+if not any(categorized_articles.values()):
     email_body = """
     <html>
     <body>
-    <p>Nothing New today. Thanks for checking in with us.</p>
+    <p>Nothing new today. Thanks for checking in with us.</p>
     </body>
     </html>
     """
