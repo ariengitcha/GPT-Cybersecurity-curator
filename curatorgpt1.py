@@ -1,8 +1,4 @@
-Sure, I will create lists to exclude these URLs from being curated into the daily email and update the script to filter out these URLs during the article extraction process.
 
-Here is the updated script with the exclusion logic:
-
-```python
 import requests
 from bs4 import BeautifulSoup
 import smtplib
