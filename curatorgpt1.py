@@ -1,4 +1,3 @@
-
 import requests
 from bs4 import BeautifulSoup
 import smtplib
@@ -203,8 +202,6 @@ email_body = """
     body {
         font-family: Arial, sans-serif; 
         line-height: 1.6;
-        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
-        background-size: cover;  /* Ensure the image covers the entire background */
     }
     h2 {
         color: #2E8B57;
@@ -267,4 +264,12 @@ if not any(categorized_articles.values()):
 msg = MIMEMultipart()
 msg['From'] = email_from
 msg['To'] = ", ".join(email_to)
-msg['Subject']
+msg['Subject'] = email_subject
+msg.attach(MIMEText(email_body, 'html'))
+
+# Send email
+try:
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(email_from, email_password)
+    text =
