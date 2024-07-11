@@ -23,6 +23,10 @@ email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 email_body = ""
 
+# Debugging prints
+print(f"EMAIL_ADDRESS_GPT: {email_from}")
+print(f"EMAIL_PASSWORD_GPT: {email_password}")
+
 # Define websites and categories
 websites = {
     "Dark Reading": "https://www.darkreading.com/",
@@ -156,115 +160,4 @@ def get_articles(base_url, keywords, processed_urls):
 
             # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
-            if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
-                if is_valid_url(href):
-                    summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
-                    processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
-
-        return articles
-    except Exception as e:
-        logging.error(f"Failed to fetch articles from {base_url}: {e}")
-        return []
-
-# Function to categorize articles
-def categorize_articles(articles):
-    categorized = {key: [] for key in keywords.keys()}
-    
-    for article in articles:
-        for category, kw_list in keywords.items():
-            if any(kw.lower() in article['title'].lower() for kw in kw_list):
-                categorized[category].append(article)
-                log_article(category, article['title'], article['url'])
-
-    return categorized
-
-# Collect articles
-start_date, end_date = get_date_range()
-all_articles = []
-processed_urls = set()
-
-for name, url in websites.items():
-    if is_website_up(url):
-        time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
-        all_articles.extend(articles)
-
-# Categorize articles
-categorized_articles = categorize_articles(all_articles)
-
-# Build HTML email body with styles and images
-email_body = """
-<html>
-<head>
-<style>
-    body {
-        font-family: Arial, sans-serif; 
-        line-height: 1.6;
-    }
-    h2 {
-        color: #2E8B57;
-    }
-    ul {
-        list-style-type: none; 
-        padding: 0;
-    }
-    li {
-        margin: 10px 0;
-    }
-    a {
-        text-decoration: none; 
-        color: #1E90FF;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
-    .summary {
-        font-size: 0.9em; 
-        color: #555;
-    }
-    .category {
-        margin-top: 20px;
-    }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
-    }
-</style>
-</head>
-<body>
-<h1>Daily Cybersecurity News</h1>
-"""
-
-for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
-    for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
-    email_body += "</ul></div>"
-
-email_body += """
-</body>
-</html>
-"""
-
-# Check if email body is empty
-if not any(categorized_articles.values()):
-    email_body = """
-    <html>
-    <body>
-    <p>Nothing new today. Thanks for checking in with us.</p>
-    </body>
-    </html>
-    """
-
-# Create email message
-msg = MIMEMultipart()
-msg['From'] = email_from
-msg['To'] = ", ".join(email_to)
-msg['Subject'] = email_subject
-msg.attach(MIMEText(email_body, 'html'))
-
-# Send
+            if href not in processed_urls and not is_excluded_url(href) and
