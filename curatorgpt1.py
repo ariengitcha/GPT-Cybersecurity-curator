@@ -61,9 +61,9 @@ c.execute('''CREATE TABLE IF NOT EXISTS articles
              (date text, category text, title text, url text)''')
 
 # Insert a row of data
-def log_article(category, title, url):
+def log_article(category, title, url, date):
     c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
-              (datetime.now().strftime('%Y-%m-%d'), category, title, url))
+              (date, category, title, url))
     conn.commit()
 
 # Get a requests session with retries
@@ -114,11 +114,6 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Example function to summarize an article
-def summarize_article(url):
-    # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
-
 # Function to check if a URL should be excluded
 def is_excluded_url(url):
     for excluded in excluded_urls:
@@ -129,6 +124,18 @@ def is_excluded_url(url):
         elif url.startswith(excluded):
             return True
     return False
+
+# Function to get the publication date of an article
+def get_publication_date(soup):
+    # This function should be customized based on the structure of each website
+    # Example for a generic case:
+    date_str = soup.find('time')  # Update this line based on the actual HTML structure
+    if date_str:
+        try:
+            return datetime.strptime(date_str['datetime'], '%Y-%m-%dT%H:%M:%SZ')  # Adjust the format if needed
+        except Exception as e:
+            logging.warning(f"Could not parse date: {e}")
+    return None
 
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
@@ -147,9 +154,14 @@ def get_articles(base_url, keywords, processed_urls):
             href = urljoin(base_url, href)
             if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    articles.append({"title": title.strip(), "url": href})
-                    processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href}")
+                    article_response = session.get(href, timeout=30)
+                    article_soup = BeautifulSoup(article_response.content, 'lxml')
+                    pub_date = get_publication_date(article_soup)
+                    if pub_date and start_date <= pub_date < end_date:
+                        articles.append({"title": title.strip(), "url": href, "date": pub_date.strftime('%Y-%m-%d')})
+                        processed_urls.add(href)
+                        logging.info(f"Found article: {title.strip()} - {href} - {pub_date}")
+                        log_article(category, title.strip(), href, pub_date.strftime('%Y-%m-%d'))
 
         return articles
     except Exception as e:
@@ -164,7 +176,6 @@ def categorize_articles(articles):
         for category, kw_list in keywords.items():
             if any(kw.lower() in article['title'].lower() for kw in kw_list):
                 categorized[category].append(article)
-                log_article(category, article['title'], article['url'])
 
     return categorized
 
@@ -220,7 +231,7 @@ email_body = """
 for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a></li>"
+        email_body += f"<li><a href='{article['url']}'>{article['title']}</a> - {article['date']}</li>"
         email_body += "<hr>"
     email_body += "</ul></div>"
 
