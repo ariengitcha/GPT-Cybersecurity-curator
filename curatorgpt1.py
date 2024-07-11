@@ -103,7 +103,7 @@ def get_date_range():
 def is_website_up(url):
     try:
         response = requests.head(url, timeout=30)
-        if response.status_code == 200:
+        if response.status_code == 200):
             logging.info(f"Website {url} is up and running.")
             return True
         else:
@@ -158,10 +158,9 @@ def get_articles(base_url, keywords, processed_urls):
             href = urljoin(base_url, href)
             if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    articles.append({"title": title.strip(), "url": href})
                     processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
+                    logging.info(f"Found article: {title.strip()} - {href}")
 
         return articles
     except Exception as e:
@@ -220,10 +219,6 @@ email_body = """
     a:hover {
         text-decoration: underline;
     }
-    .summary {
-        font-size: 0.9em; 
-        color: #555;
-    }
     .category {
         margin-top: 20px;
     }
@@ -242,7 +237,7 @@ email_body = """
 for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+        email_body += f"<li><a href='{article['url']}'>{article['title']}</a></li>"
     email_body += "</ul></div>"
 
 email_body += """
