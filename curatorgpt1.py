@@ -88,6 +88,9 @@ def get_date_range():
     end_date = start_date + timedelta(days=1)
     return start_date, end_date
 
+start_date, end_date = get_date_range()
+logging.info(f"Date range: {start_date} to {end_date}")
+
 # Function to check if a website is up and running
 def is_website_up(url):
     try:
@@ -132,7 +135,9 @@ def get_publication_date(soup):
     date_str = soup.find('time')  # Update this line based on the actual HTML structure
     if date_str:
         try:
-            return datetime.strptime(date_str['datetime'], '%Y-%m-%dT%H:%M:%SZ')  # Adjust the format if needed
+            pub_date = datetime.strptime(date_str['datetime'], '%Y-%m-%dT%H:%M:%SZ')  # Adjust the format if needed
+            logging.info(f"Found publication date: {pub_date}")
+            return pub_date
         except Exception as e:
             logging.warning(f"Could not parse date: {e}")
     return None
@@ -180,7 +185,6 @@ def categorize_articles(articles):
     return categorized
 
 # Collect articles
-start_date, end_date = get_date_range()
 all_articles = []
 processed_urls = set()
 
@@ -257,7 +261,7 @@ msg['To'] = ", ".join(email_to)
 msg['Subject'] = email_subject
 msg.attach(MIMEText(email_body, 'html'))
 
-# Debug logs before sending the email
+# Log email details before sending
 logging.info("Preparing to send email with the following content:")
 logging.info(f"From: {email_from}")
 logging.info(f"To: {email_to}")
