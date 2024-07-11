@@ -39,15 +39,6 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
-# Example images for categories
-category_images = {
-    "Breach": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/2555d4ca98eac279bbd67063cfa1490dc13b9c16/images/CyberTyger1.jpeg",
-    "Vulnerability": "https://github.com/ariengitcha/GPT-Cybersecurity-curator/blob/2555d4ca98eac279bbd67063cfa1490dc13b9c16/images/CyberTyger1.jpeg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
-}
-
 # URLs to exclude
 excluded_urls = [
     "https://krebsonsecurity.com/category/",
@@ -220,12 +211,6 @@ email_body = """
     .category {
         margin-top: 20px;
     }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
-    }
 </style>
 </head>
 <body>
@@ -233,7 +218,7 @@ email_body = """
 """
 
 for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
+    email_body += f"<div class='category'><h2>{category}</h2><ul>"
     for article in articles:
         email_body += f"<li><a href='{article['url']}'>{article['title']}</a></li>"
         email_body += "<hr>"
