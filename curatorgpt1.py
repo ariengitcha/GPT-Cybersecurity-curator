@@ -19,7 +19,7 @@ logging.basicConfig(filename='curatorgpt.log', level=logging.INFO,
 # Email configuration
 email_from = os.getenv('EMAIL_ADDRESS_GPT')
 email_password = os.getenv('EMAIL_PASSWORD_GPT')
-email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
+email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com", "erik.witkop@ironbow.com"]
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 email_body = ""
 
