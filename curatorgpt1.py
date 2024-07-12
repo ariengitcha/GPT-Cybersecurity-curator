@@ -129,17 +129,16 @@ def is_excluded_url(url):
     return False
 
 # Function to get the publication date of an article
-def get_publication_date(soup):
-    # This function should be customized based on the structure of each website
-    # Example for a generic case:
-    date_str = soup.find('time')  # Update this line based on the actual HTML structure
-    if date_str:
-        try:
+def get_publication_date(soup, url):
+    # Example for a generic case, this should be tailored to each website
+    try:
+        date_str = soup.find('time')
+        if date_str:
             pub_date = datetime.strptime(date_str['datetime'], '%Y-%m-%dT%H:%M:%SZ')  # Adjust the format if needed
-            logging.info(f"Found publication date: {pub_date}")
+            logging.info(f"Found publication date for {url}: {pub_date}")
             return pub_date
-        except Exception as e:
-            logging.warning(f"Could not parse date: {e}")
+    except Exception as e:
+        logging.warning(f"Could not parse date for {url}: {e}")
     return None
 
 # Function to get articles from a website
@@ -161,13 +160,15 @@ def get_articles(base_url, keywords, processed_urls):
                 if is_valid_url(href):
                     article_response = session.get(href, timeout=30)
                     article_soup = BeautifulSoup(article_response.content, 'lxml')
-                    pub_date = get_publication_date(article_soup)
+                    pub_date = get_publication_date(article_soup, href)
                     if pub_date and start_date <= pub_date < end_date:
                         articles.append({"title": title.strip(), "url": href, "date": pub_date.strftime('%Y-%m-%d')})
                         processed_urls.add(href)
                         logging.info(f"Found article: {title.strip()} - {href} - {pub_date}")
                         log_article(category, title.strip(), href, pub_date.strftime('%Y-%m-%d'))
 
+        if not articles:
+            logging.info(f"No new articles found for {base_url} in the specified date range.")
         return articles
     except Exception as e:
         logging.error(f"Failed to fetch articles from {base_url}: {e}")
