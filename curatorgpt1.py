@@ -39,14 +39,18 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
-# Example images for categories
-category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
-    "Vulnerability": "https://example.com/vulnerability_image.jpg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
-}
+# URLs to exclude
+excluded_urls = [
+    "https://krebsonsecurity.com/category/",
+    "https://krebsonsecurity.com/category/*",
+    "*/author/*",
+    "https://www.csoonline.com/compliance/",
+    "https://www.csoonline.com/compliance/*",
+    "https://www.darkreading.com/program/*",
+    "https://thehackernews.com/#email-outer",
+    "https://www.csoonline.com/artificial-intelligence/",
+    "https://www.csoonline.com/generative-ai/"
+]
 
 # Create or connect to a SQLite database
 conn = sqlite3.connect('articles.db')
@@ -57,9 +61,9 @@ c.execute('''CREATE TABLE IF NOT EXISTS articles
              (date text, category text, title text, url text)''')
 
 # Insert a row of data
-def log_article(category, title, url):
+def log_article(category, title, url, date):
     c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
-              (datetime.now().strftime('%Y-%m-%d'), category, title, url))
+              (date, category, title, url))
     conn.commit()
 
 # Get a requests session with retries
@@ -77,14 +81,15 @@ def get_session():
 
 session = get_session()
 
-# Determine the date range for the search
+# Determine the date range for the search (previous day)
 def get_date_range():
-    today = datetime.now()
-    if today.weekday() == 0:  # Monday
-        start_date = today - timedelta(days=3)  # From Friday
-    else:
-        start_date = today - timedelta(days=1)  # Past 24 hours
-    return start_date, today
+    yesterday = datetime.now() - timedelta(days=1)
+    start_date = datetime(yesterday.year, yesterday.month, yesterday.day)
+    end_date = start_date + timedelta(days=1)
+    return start_date, end_date
+
+start_date, end_date = get_date_range()
+logging.info(f"Date range: {start_date} to {end_date}")
 
 # Function to check if a website is up and running
 def is_website_up(url):
@@ -112,10 +117,29 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Example function to summarize an article
-def summarize_article(url):
-    # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
+# Function to check if a URL should be excluded
+def is_excluded_url(url):
+    for excluded in excluded_urls:
+        if '*' in excluded:
+            excluded_pattern = excluded.replace('*', '')
+            if excluded_pattern in url:
+                return True
+        elif url.startswith(excluded):
+            return True
+    return False
+
+# Function to get the publication date of an article
+def get_publication_date(soup, url):
+    # Example for a generic case, this should be tailored to each website
+    try:
+        date_str = soup.find('time')
+        if date_str:
+            pub_date = datetime.strptime(date_str['datetime'], '%Y-%m-%dT%H:%M:%SZ')  # Adjust the format if needed
+            logging.info(f"Found publication date for {url}: {pub_date}")
+            return pub_date
+    except Exception as e:
+        logging.warning(f"Could not parse date for {url}: {e}")
+    return None
 
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
@@ -132,13 +156,19 @@ def get_articles(base_url, keywords, processed_urls):
 
             # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
-            if href not in processed_urls and any(keyword.lower() in title.lower() for keyword in keywords):
+            if href not in processed_urls and not is_excluded_url(href) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
-                    processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
+                    article_response = session.get(href, timeout=30)
+                    article_soup = BeautifulSoup(article_response.content, 'lxml')
+                    pub_date = get_publication_date(article_soup, href)
+                    if pub_date and start_date <= pub_date < end_date:
+                        articles.append({"title": title.strip(), "url": href, "date": pub_date.strftime('%Y-%m-%d')})
+                        processed_urls.add(href)
+                        logging.info(f"Found article: {title.strip()} - {href} - {pub_date}")
+                        log_article(category, title.strip(), href, pub_date.strftime('%Y-%m-%d'))
 
+        if not articles:
+            logging.info(f"No new articles found for {base_url} in the specified date range.")
         return articles
     except Exception as e:
         logging.error(f"Failed to fetch articles from {base_url}: {e}")
@@ -152,12 +182,10 @@ def categorize_articles(articles):
         for category, kw_list in keywords.items():
             if any(kw.lower() in article['title'].lower() for kw in kw_list):
                 categorized[category].append(article)
-                log_article(category, article['title'], article['url'])
 
     return categorized
 
 # Collect articles
-start_date, end_date = get_date_range()
 all_articles = []
 processed_urls = set()
 
@@ -175,15 +203,30 @@ email_body = """
 <html>
 <head>
 <style>
-    body {font-family: Arial, sans-serif; line-height: 1.6;}
-    h2 {color: #2E8B57;}
-    ul {list-style-type: none; padding: 0;}
-    li {margin: 10px 0;}
-    a {text-decoration: none; color: #1E90FF;}
-    a:hover {text-decoration: underline;}
-    .summary {font-size: 0.9em; color: #555;}
-    .category {margin-top: 20px;}
-    .category img {width: 100px; height: auto; float: left; margin-right: 20px;}
+    body {
+        font-family: Arial, sans-serif; 
+        line-height: 1.6;
+    }
+    h2 {
+        color: #2E8B57;
+    }
+    ul {
+        list-style-type: none; 
+        padding: 0;
+    }
+    li {
+        margin: 10px 0;
+    }
+    a {
+        text-decoration: none; 
+        color: #1E90FF;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+    .category {
+        margin-top: 20px;
+    }
 </style>
 </head>
 <body>
@@ -191,9 +234,10 @@ email_body = """
 """
 
 for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
+    email_body += f"<div class='category'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+        email_body += f"<li><a href='{article['url']}'>{article['title']}</a> - {article['date']}</li>"
+        email_body += "<hr>"
     email_body += "</ul></div>"
 
 email_body += """
@@ -202,11 +246,11 @@ email_body += """
 """
 
 # Check if email body is empty
-if not email_body.strip():
+if not any(categorized_articles.values()):
     email_body = """
     <html>
     <body>
-    <p>Nothing New today. Thanks for checking in with us.</p>
+    <p>Nothing new today. Thanks for checking in with us.</p>
     </body>
     </html>
     """
@@ -217,6 +261,13 @@ msg['From'] = email_from
 msg['To'] = ", ".join(email_to)
 msg['Subject'] = email_subject
 msg.attach(MIMEText(email_body, 'html'))
+
+# Log email details before sending
+logging.info("Preparing to send email with the following content:")
+logging.info(f"From: {email_from}")
+logging.info(f"To: {email_to}")
+logging.info(f"Subject: {email_subject}")
+logging.info(f"Body: {email_body}")
 
 # Send email
 try:
