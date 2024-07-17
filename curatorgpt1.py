@@ -8,7 +8,7 @@ import os
 import time
 import logging
 import sqlite3
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -21,7 +21,6 @@ email_from = os.getenv('EMAIL_ADDRESS_GPT')
 email_password = os.getenv('EMAIL_PASSWORD_GPT')
 email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
 email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
-email_body = ""
 
 # Define websites and categories
 websites = {
@@ -54,13 +53,16 @@ c = conn.cursor()
 
 # Create table
 c.execute('''CREATE TABLE IF NOT EXISTS articles
-             (date text, category text, title text, url text)''')
+             (date text, category text, title text, url text UNIQUE)''')
 
 # Insert a row of data
 def log_article(category, title, url):
-    c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
-              (datetime.now().strftime('%Y-%m-%d'), category, title, url))
-    conn.commit()
+    try:
+        c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
+                  (datetime.now().strftime('%Y-%m-%d'), category, title, url))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        logging.info(f"Article already exists in database: {title}")
 
 # Get a requests session with retries
 def get_session():
@@ -100,6 +102,25 @@ def is_website_up(url):
         logging.error(f"Website {url} is not reachable. Error: {e}")
         return False
 
+# Function to check if a URL should be processed
+def should_process_url(url, processed_urls):
+    parsed_url = urlparse(url)
+    path = parsed_url.path
+
+    # Check if URL has already been processed
+    if url in processed_urls:
+        return False
+
+    # Check for /author/ in the URL
+    if '/author/' in path:
+        return False
+
+    # Check if it's a category URL (you may need to adjust this based on the specific website structures)
+    if any(keyword in path for keyword in ['category', 'topics', 'section']):
+        return False
+
+    return True
+
 # Function to check if a URL returns a 404 error
 def is_valid_url(url):
     try:
@@ -132,7 +153,7 @@ def get_articles(base_url, keywords, processed_urls):
 
             # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
-            if href not in processed_urls and any(keyword.lower() in title.lower() for keyword in keywords):
+            if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
                     summary = summarize_article(href)
                     articles.append({"title": title.strip(), "url": href, "summary": summary})
@@ -153,6 +174,7 @@ def categorize_articles(articles):
             if any(kw.lower() in article['title'].lower() for kw in kw_list):
                 categorized[category].append(article)
                 log_article(category, article['title'], article['url'])
+                break  # Assign to first matching category
 
     return categorized
 
@@ -211,6 +233,10 @@ email_body = """
         float: left; 
         margin-right: 20px;
     }
+    .article-separator {
+        border-top: 2px solid #000; 
+        margin: 10px 0;
+    }
 </style>
 </head>
 <body>
@@ -221,6 +247,7 @@ for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
         email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+        email_body += "<div class='article-separator'></div>"  # Bold line between articles
     email_body += "</ul></div>"
 
 email_body += """
