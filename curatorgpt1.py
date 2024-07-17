@@ -11,6 +11,7 @@ import sqlite3
 from urllib.parse import urljoin, urlparse
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from dateutil import parser as date_parser
 
 # Setup logging
 logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
@@ -139,11 +140,13 @@ def summarize_article(url):
     return f"Summary of {url}"
 
 # Function to get articles from a website
+from dateutil import parser as date_parser
+
 def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
     try:
         response = session.get(base_url, timeout=30)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response.raise_for_status()
         soup = BeautifulSoup(response.content, 'lxml')
 
         articles = []
@@ -151,12 +154,17 @@ def get_articles(base_url, keywords, processed_urls):
             href = link['href']
             title = link.get_text()
 
-            # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
             if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
+                    article_response = session.get(href, timeout=30)
+                    article_soup = BeautifulSoup(article_response.content, 'lxml')
+                    
+                    # Extract date
+                    date = extract_date(article_soup)
+                    
                     summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    articles.append({"title": title.strip(), "url": href, "summary": summary, "date": date})
                     processed_urls.add(href)
                     logging.info(f"Found article: {title.strip()} - {href} - {summary}")
 
@@ -165,6 +173,16 @@ def get_articles(base_url, keywords, processed_urls):
         logging.error(f"Failed to fetch articles from {base_url}: {e}")
         return []
 
+def extract_date(soup):
+    date_tags = soup.find_all(['time', 'span', 'p'], class_=['date', 'time', 'published'])
+    for tag in date_tags:
+        date_str = tag.get('datetime') or tag.get_text()
+        try:
+            return date_parser.parse(date_str)
+        except ValueError:
+            continue
+    return None
+  
 # Function to categorize articles
 def categorize_articles(articles):
     categorized = {key: [] for key in keywords.keys()}
@@ -193,49 +211,16 @@ for name, url in websites.items():
 categorized_articles = categorize_articles(all_articles)
 
 # Build HTML email body with styles and images
+# Build HTML email body with styles and images
 email_body = """
 <html>
 <head>
 <style>
-    body {
-        font-family: Arial, sans-serif; 
-        line-height: 1.6;
-        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
-        background-size: cover;  /* Ensure the image covers the entire background */
-    }
-    h2 {
-        color: #2E8B57;
-    }
-    ul {
-        list-style-type: none; 
-        padding: 0;
-    }
-    li {
-        margin: 10px 0;
-    }
-    a {
-        text-decoration: none; 
-        color: #1E90FF;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
-    .summary {
-        font-size: 0.9em; 
-        color: #555;
-    }
-    .category {
-        margin-top: 20px;
-    }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
-    }
-    .article-separator {
-        border-top: 2px solid #000; 
-        margin: 10px 0;
+    /* ... (previous styles) ... */
+    .article-date {
+        font-size: 0.8em;
+        color: #666;
+        font-style: italic;
     }
 </style>
 </head>
@@ -246,7 +231,10 @@ email_body = """
 for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+        date_str = article['date'].strftime("%Y-%m-%d %H:%M:%S") if article['date'] else "Date not available"
+        email_body += f"<li><div class='article-date'>{date_str}</div>"
+        email_body += f"<a href='{article['url']}'>{article['title']}</a>"
+        email_body += f"<div class='summary'>{article['summary']}</div></li>"
         email_body += "<div class='article-separator'></div>"  # Bold line between articles
     email_body += "</ul></div>"
 
