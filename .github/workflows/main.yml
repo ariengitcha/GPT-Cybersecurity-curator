@@ -3,7 +3,7 @@ name: Curate News
 on:
   schedule:
     - cron: '0 9 * * 1-5'
-  workflow_dispatch: # This allows manual triggering of the workflow
+  workflow_dispatch:
 
 jobs:
   curate-news:
@@ -11,10 +11,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4 # Update to the latest version
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4 # Update to the latest version
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
