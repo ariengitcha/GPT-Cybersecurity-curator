@@ -38,15 +38,6 @@ keywords = {
     "AI": ["AI", "artificial intelligence"]
 }
 
-# Example images for categories
-category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
-    "Vulnerability": "https://example.com/vulnerability_image.jpg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
-}
-
 # Create or connect to a SQLite database
 conn = sqlite3.connect('articles.db')
 c = conn.cursor()
@@ -192,7 +183,7 @@ for name, url in websites.items():
 # Categorize articles
 categorized_articles = categorize_articles(all_articles)
 
-# Build HTML email body with styles and images
+# Build HTML email body with styles
 email_body = """
 <html>
 <head>
@@ -213,25 +204,12 @@ email_body = """
     li {
         margin: 10px 0;
     }
-    a {
-        text-decoration: none; 
-        color: #1E90FF;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
     .summary {
         font-size: 0.9em; 
         color: #555;
     }
     .category {
         margin-top: 20px;
-    }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
     }
     .article-separator {
         border-top: 2px solid #000; 
@@ -244,7 +222,7 @@ email_body = """
 """
 
 for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
+    email_body += f"<div class='category'><h2>{category}</h2><ul>"
     for article in articles:
         email_body += f"<li>{article['title']}<div class='summary'>{article['summary']}</div></li>"
         email_body += "<div class='article-separator'></div>"  # Bold line between articles
