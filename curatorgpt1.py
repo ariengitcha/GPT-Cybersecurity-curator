@@ -136,23 +136,9 @@ def is_valid_url(url):
 # Example function to summarize an article
 def summarize_article(url):
     # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
+    return f"Summary of article from {url}"
 
-# Function to clean title
-def clean_title(title):
-    # Remove any text after common separators
-    separators = [' | ', ' - ', ' — ', ' • ']
-    for separator in separators:
-        title = title.split(separator)[0]
-    return title.strip()
-
-# Function to limit title length
-def limit_title_length(title, max_length=100):
-    if len(title) <= max_length:
-        return title
-    return title[:max_length].rsplit(' ', 1)[0] + '...'
-
-# Updated function to get articles from a website
+# Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
     try:
@@ -161,49 +147,23 @@ def get_articles(base_url, keywords, processed_urls):
         soup = BeautifulSoup(response.content, 'lxml')
 
         articles = []
-        # Adjust these selectors based on the specific structure of each website
-        title_selectors = [
-            'h2 a',  # Common for main article titles
-            'h3 a',  # Sometimes used for secondary articles
-            '.article-title a',  # A common class for article titles
-            '.entry-title a'  # Another common class
-        ]
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            title = link.get_text()
 
-        for selector in title_selectors:
-            for link in soup.select(selector):
-                href = link.get('href')
-                title = link.get_text(strip=True)
-
-                # Ensure the URL is absolute
-                href = urljoin(base_url, href)
-
-                if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
-                    if is_valid_url(href):
-                        # Clean and limit the title length
-                        title = clean_title(title)
-                        title = limit_title_length(title, max_length=100)  # Adjust max_length as needed
-
-                        summary = summarize_article(href)
-                        articles.append({"title": title, "url": href, "summary": summary})
-                        processed_urls.add(href)
-                        logging.info(f"Found article: {title} - {href} - {summary}")
+            # Ensure the URL is absolute using urljoin
+            href = urljoin(base_url, href)
+            if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
+                if is_valid_url(href):
+                    summary = summarize_article(href)
+                    articles.append({"title": title.strip(), "summary": summary})
+                    processed_urls.add(href)
+                    logging.info(f"Found article: {title.strip()} - {summary}")
 
         return articles
     except Exception as e:
         logging.error(f"Failed to fetch articles from {base_url}: {e}")
         return []
-
-# Custom function for Dark Reading (adjust based on actual website structure)
-def get_articles_dark_reading(base_url, keywords, processed_urls):
-    # Implement custom logic for Dark Reading
-    # This is a placeholder - you'll need to customize this based on the site's structure
-    return get_articles(base_url, keywords, processed_urls)
-
-# Custom function for The Hacker News (adjust based on actual website structure)
-def get_articles_hacker_news(base_url, keywords, processed_urls):
-    # Implement custom logic for The Hacker News
-    # This is a placeholder - you'll need to customize this based on the site's structure
-    return get_articles(base_url, keywords, processed_urls)
 
 # Function to categorize articles
 def categorize_articles(articles):
@@ -213,7 +173,7 @@ def categorize_articles(articles):
         for category, kw_list in keywords.items():
             if any(kw.lower() in article['title'].lower() for kw in kw_list):
                 categorized[category].append(article)
-                log_article(category, article['title'], article['url'])
+                log_article(category, article['title'], "")  # Empty string for URL
                 break  # Assign to first matching category
 
     return categorized
@@ -226,12 +186,7 @@ processed_urls = set()
 for name, url in websites.items():
     if is_website_up(url):
         time.sleep(30)  # Wait for 30 seconds before processing each website
-        if name == "Dark Reading":
-            articles = get_articles_dark_reading(url, sum(keywords.values(), []), processed_urls)
-        elif name == "The Hacker News":
-            articles = get_articles_hacker_news(url, sum(keywords.values(), []), processed_urls)
-        else:
-            articles = get_articles(url, sum(keywords.values(), []), processed_urls)
+        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
         all_articles.extend(articles)
 
 # Categorize articles
@@ -291,7 +246,7 @@ email_body = """
 for category, articles in categorized_articles.items():
     email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
     for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+        email_body += f"<li>{article['title']}<div class='summary'>{article['summary']}</div></li>"
         email_body += "<div class='article-separator'></div>"  # Bold line between articles
     email_body += "</ul></div>"
 
