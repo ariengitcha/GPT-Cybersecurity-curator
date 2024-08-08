@@ -13,6 +13,8 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import concurrent.futures
 import sys
+import json
+from pytz import timezone
 
 # Setup logging
 logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
@@ -22,7 +24,7 @@ logging.basicConfig(filename='curatorgpt.log', level=logging.INFO,
 email_from = os.getenv('EMAIL_ADDRESS_GPT')
 email_password = os.getenv('EMAIL_PASSWORD_GPT')
 email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
-email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
+email_subject = f"Daily Cybersecurity News and Threat Intelligence - {datetime.now().strftime('%Y-%m-%d')}"
 
 # Define websites and categories
 websites = {
@@ -34,10 +36,12 @@ websites = {
 
 keywords = {
     "Breach": ["breach", "data breach"],
-    "Vulnerability": ["vulnerability", "exploit"],
-    "Compliance": ["compliance", "regulation"],
+    "Vulnerability": ["vulnerability", "exploit", "CVE"],
+    "Compliance": ["compliance", "regulation", "GDPR", "CCPA", "NIST"],
     "Startup": ["startup", "funding"],
-    "AI": ["AI", "artificial intelligence"]
+    "AI": ["AI", "artificial intelligence", "machine learning"],
+    "Threat Intel": ["APT", "campaign", "malware", "ransomware"],
+    "Phishing": ["phishing", "social engineering", "spam"],
 }
 
 # Create or connect to a SQLite database
@@ -187,10 +191,72 @@ def collect_articles(websites, keywords):
 
     return all_articles
 
+# Function to fetch threat intelligence from AlienVault OTX
+def get_alienvault_intel():
+    api_key = os.getenv('ALIENVAULT_API_KEY')
+    url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+    headers = {"X-OTX-API-KEY": api_key}
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data['results'][:5]  # Return the 5 most recent pulses
+    except Exception as e:
+        logging.error(f"Failed to fetch AlienVault intel: {e}")
+        return []
+
+# Function to fetch new CVEs from NVD
+def get_new_cves():
+    two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%S:000 UTC-00:00")
+    url = f"https://services.nvd.nist.gov/rest/json/cves/1.0?pubStartDate={two_days_ago}&resultsPerPage=5"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data['result']['CVE_Items']
+    except Exception as e:
+        logging.error(f"Failed to fetch new CVEs: {e}")
+        return []
+
+# Function to fetch cybersecurity regulation updates
+def get_regulation_updates():
+    # This is a placeholder. In a real-world scenario, you'd integrate with 
+    # a service that provides regulatory updates.
+    return [
+        {"title": "GDPR: New guidelines on AI and data protection", "url": "https://example.com/gdpr-ai"},
+        {"title": "CCPA: Proposed modifications to regulations", "url": "https://example.com/ccpa-mods"}
+    ]
+
+# Function to get geopolitical updates
+def get_geopolitical_updates():
+    # This is a placeholder. In a real-world scenario, you'd integrate with 
+    # a geopolitical news API or use web scraping.
+    return [
+        {"title": "Tensions rise in cyberspace between nations A and B", "summary": "Increased cyber activities observed..."},
+        {"title": "New international cybersecurity coalition formed", "summary": "Five countries join forces to..."}
+    ]
+
+# Function to get upcoming cybersecurity events and training
+def get_upcoming_events():
+    # This is a placeholder. In a real-world scenario, you'd integrate with 
+    # an events API or maintain your own database of upcoming events.
+    return [
+        {"title": "Advanced Threat Hunting Webinar", "date": "2023-06-15", "url": "https://example.com/webinar"},
+        {"title": "Annual Cybersecurity Conference", "date": "2023-07-01", "url": "https://example.com/conference"}
+    ]
+
 # Main execution function
 def main():
     all_articles = collect_articles(websites, keywords)
     categorized_articles = categorize_articles(all_articles)
+    
+    threat_intel = get_alienvault_intel()
+    new_cves = get_new_cves()
+    regulation_updates = get_regulation_updates()
+    geopolitical_updates = get_geopolitical_updates()
+    upcoming_events = get_upcoming_events()
 
     # Build HTML email body with styles
     email_body = """
@@ -200,10 +266,18 @@ def main():
         body {
             font-family: Arial, sans-serif; 
             line-height: 1.6;
-            background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
-            background-size: cover;
+            background-color: #f4f4f4;
+            color: #333;
         }
-        h2 {
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
             color: #2E8B57;
         }
         ul {
@@ -212,6 +286,9 @@ def main():
         }
         li {
             margin: 10px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
         }
         .summary {
             font-size: 0.9em; 
@@ -221,15 +298,17 @@ def main():
             margin-top: 20px;
         }
         .article-separator {
-            border-top: 2px solid #000; 
+            border-top: 1px solid #ddd; 
             margin: 10px 0;
         }
     </style>
     </head>
     <body>
-    <h1>Daily Cybersecurity News</h1>
+    <div class="container">
+    <h1>Daily Cybersecurity News and Threat Intelligence</h1>
     """
 
+    # Add categorized articles
     for category, articles in categorized_articles.items():
         email_body += f"<div class='category'><h2>{category}</h2><ul>"
         for article in articles:
@@ -237,20 +316,41 @@ def main():
             email_body += "<div class='article-separator'></div>"
         email_body += "</ul></div>"
 
+    # Add Threat Intelligence
+    email_body += "<h2>Threat Intelligence</h2><ul>"
+    for pulse in threat_intel:
+        email_body += f"<li><strong>{pulse['name']}</strong><br>{pulse['description'][:200]}...</li>"
+    email_body += "</ul>"
+
+    # Add New CVEs
+    email_body += "<h2>New Critical Vulnerabilities</h2><ul>"
+    for cve in new_cves:
+        email_body += f"<li><strong>{cve['cve']['CVE_data_meta']['ID']}</strong>: {cve['cve']['description']['description_data'][0]['value'][:200]}...</li>"
+    email_body += "</ul>"
+
+    # Add Regulation Updates
+    email_body += "<h2>Regulatory and Compliance Updates</h2><ul>"
+    for update in regulation_updates:
+        email_body += f"<li><a href='{update['url']}'>{update['title']}</a></li>"
+    email_body += "</ul>"
+
+    # Add Geopolitical Updates
+    email_body += "<h2>Geopolitical Context</h2><ul>"
+    for update in geopolitical_updates:
+        email_body += f"<li><strong>{update['title']}</strong><br>{update['summary']}</li>"
+    email_body += "</ul>"
+
+    # Add Upcoming Events
+    email_body += "<h2>Upcoming Events and Training</h2><ul>"
+    for event in upcoming_events:
+        email_body += f"<li><strong>{event['title']}</strong> - {event['date']}<br><a href='{event['url']}'>More Info</a></li>"
+    email_body += "</ul>"
+
     email_body += """
+    </div>
     </body>
     </html>
     """
-
-    # Check if email body is empty
-    if not any(categorized_articles.values()):
-        email_body = """
-        <html>
-        <body>
-        <p>Nothing new today. Thanks for checking in with us.</p>
-        </body>
-        </html>
-        """
 
     # Create email message
     msg = MIMEMultipart()
@@ -272,7 +372,3 @@ def main():
         logging.error(f"Failed to send email: {e}")
 
     # Close the database connection
-    conn.close()
-
-if __name__ == "__main__":
-    main()
