@@ -1,288 +1,182 @@
-import requests
+import aiohttp
+import asyncio
 from bs4 import BeautifulSoup
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
-import time
 import logging
-import sqlite3
-from urllib.parse import urljoin, urlparse
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+import json
+from urllib.parse import urljoin
+import smtplib
+import re
 
 # Setup logging
-logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
-                    format='%(asctime)s %(levelname)s:%(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
-# Email configuration
-email_from = os.getenv('EMAIL_ADDRESS_GPT')
-email_password = os.getenv('EMAIL_PASSWORD_GPT')
-email_to = ["ariennation@gmail.com", "arien.seghetti@ironbow.com"]
-email_subject = f"Daily Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
+# Configuration
+EMAIL_FROM = os.environ.get('EMAIL_ADDRESS_GPT')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD_GPT')
+EMAIL_TO = json.loads(os.environ.get('EMAIL_TO', '[]'))
+EMAIL_SUBJECT = f"Cybersecurity News - {datetime.now().strftime('%Y-%m-%d')}"
 
-# Define websites and categories
-websites = {
+WEBSITES = {
     "Dark Reading": "https://www.darkreading.com/",
     "The Hacker News": "https://thehackernews.com/",
     "CSO Online": "https://www.csoonline.com/",
     "Krebs on Security": "https://krebsonsecurity.com/"
 }
 
-keywords = {
-    "Breach": ["breach", "data breach"],
-    "Vulnerability": ["vulnerability", "exploit"],
-    "Compliance": ["compliance", "regulation"],
-    "Startup": ["startup", "funding"],
-    "AI": ["AI", "artificial intelligence"]
+KEYWORDS = {
+    "Breach": ["breach", "data breach", "leaked", "exposed"],
+    "Vulnerability": ["vulnerability", "exploit", "flaw", "zero-day"],
+    "Compliance": ["compliance", "regulation", "GDPR", "CCPA"],
+    "Startup": ["startup", "funding", "venture capital", "series A"],
+    "AI": ["AI", "artificial intelligence", "machine learning", "deep learning"]
 }
 
-# Example images for categories
-category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
-    "Vulnerability": "https://example.com/vulnerability_image.jpg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
-}
-
-# Create or connect to a SQLite database
-conn = sqlite3.connect('articles.db')
-c = conn.cursor()
-
-# Create table
-c.execute('''CREATE TABLE IF NOT EXISTS articles
-             (date text, category text, title text, url text UNIQUE)''')
-
-# Insert a row of data
-def log_article(category, title, url):
-    try:
-        c.execute("INSERT INTO articles VALUES (?, ?, ?, ?)", 
-                  (datetime.now().strftime('%Y-%m-%d'), category, title, url))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        logging.info(f"Article already exists in database: {title}")
-
-# Get a requests session with retries
-def get_session():
-    session = requests.Session()
-    retry = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[500, 502, 503, 504]
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
-    return session
-
-session = get_session()
-
-# Determine the date range for the search
-def get_date_range():
-    today = datetime.now()
-    if today.weekday() == 0:  # Monday
-        start_date = today - timedelta(days=3)  # From Friday
-    else:
-        start_date = today - timedelta(days=1)  # Past 24 hours
-    return start_date, today
-
-# Function to check if a website is up and running
-def is_website_up(url):
-    try:
-        response = requests.head(url, timeout=30)
-        if response.status_code == 200:
-            logging.info(f"Website {url} is up and running.")
-            return True
+async def fetch(session, url):
+    async with session.get(url) as response:
+        if response.status == 200:
+            return await response.text()
         else:
-            logging.warning(f"Website {url} returned status code: {response.status_code}")
-            return False
-    except requests.RequestException as e:
-        logging.error(f"Website {url} is not reachable. Error: {e}")
-        return False
+            logging.error(f"Failed to fetch {url}: HTTP {response.status}")
+            return None
 
-# Function to check if a URL should be processed
-def should_process_url(url, processed_urls):
-    parsed_url = urlparse(url)
-    path = parsed_url.path
-
-    # Check if URL has already been processed
-    if url in processed_urls:
-        return False
-
-    # Check for /author/ in the URL
-    if '/author/' in path:
-        return False
-
-    # Check if it's a category URL (you may need to adjust this based on the specific website structures)
-    if any(keyword in path for keyword in ['category', 'topics', 'section']):
-        return False
-
-    return True
-
-# Function to check if a URL returns a 404 error
-def is_valid_url(url):
-    try:
-        response = session.head(url, timeout=30)
-        if response.status_code == 404:
-            logging.warning(f"URL {url} returned a 404 error.")
-            return False
-        return True
-    except requests.RequestException as e:
-        logging.error(f"Failed to check URL {url}: {e}")
-        return False
-
-# Example function to summarize an article
-def summarize_article(url):
-    # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
-
-# Function to get articles from a website
-def get_articles(base_url, keywords, processed_urls):
-    logging.info(f"Accessing URL: {base_url}")
-    try:
-        response = session.get(base_url, timeout=30)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        soup = BeautifulSoup(response.content, 'lxml')
-
-        articles = []
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            title = link.get_text()
-
-            # Ensure the URL is absolute using urljoin
-            href = urljoin(base_url, href)
-            if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
-                if is_valid_url(href):
-                    summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
-                    processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
-
-        return articles
-    except Exception as e:
-        logging.error(f"Failed to fetch articles from {base_url}: {e}")
+async def get_articles(session, base_url, keywords):
+    html = await fetch(session, base_url)
+    if not html:
         return []
 
-# Function to categorize articles
-def categorize_articles(articles):
-    categorized = {key: [] for key in keywords.keys()}
-    
-    for article in articles:
-        for category, kw_list in keywords.items():
-            if any(kw.lower() in article['title'].lower() for kw in kw_list):
-                categorized[category].append(article)
-                log_article(category, article['title'], article['url'])
-                break  # Assign to first matching category
+    soup = BeautifulSoup(html, 'html.parser')
+    articles = []
+    for link in soup.find_all('a', href=True):
+        title = link.get_text().strip()
+        if any(kw.lower() in title.lower() for kw in keywords):
+            url = urljoin(base_url, link['href'])
+            articles.append({"title": title, "url": url})
+    return articles
 
+async def categorize_article(article):
+    for category, kw_list in KEYWORDS.items():
+        if any(re.search(r'\b' + re.escape(kw.lower()) + r'\b', article['title'].lower()) for kw in kw_list):
+            return category, article
+    return None, None
+
+async def process_websites():
+    async with aiohttp.ClientSession() as session:
+        tasks = [get_articles(session, url, sum(KEYWORDS.values(), [])) for url in WEBSITES.values()]
+        all_articles = await asyncio.gather(*tasks)
+        return [article for site_articles in all_articles for article in site_articles]
+
+async def categorize_articles(articles):
+    categorized = {category: [] for category in KEYWORDS.keys()}
+    tasks = [categorize_article(article) for article in articles]
+    results = await asyncio.gather(*tasks)
+    for category, article in results:
+        if category:
+            categorized[category].append(article)
     return categorized
 
-# Collect articles
-start_date, end_date = get_date_range()
-all_articles = []
-processed_urls = set()
-
-for name, url in websites.items():
-    if is_website_up(url):
-        time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
-        all_articles.extend(articles)
-
-# Categorize articles
-categorized_articles = categorize_articles(all_articles)
-
-# Build HTML email body with styles and images
-email_body = """
-<html>
-<head>
-<style>
-    body {
-        font-family: Arial, sans-serif; 
-        line-height: 1.6;
-        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
-        background-size: cover;  /* Ensure the image covers the entire background */
-    }
-    h2 {
-        color: #2E8B57;
-    }
-    ul {
-        list-style-type: none; 
-        padding: 0;
-    }
-    li {
-        margin: 10px 0;
-    }
-    a {
-        text-decoration: none; 
-        color: #1E90FF;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
-    .summary {
-        font-size: 0.9em; 
-        color: #555;
-    }
-    .category {
-        margin-top: 20px;
-    }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
-    }
-    .article-separator {
-        border-top: 2px solid #000; 
-        margin: 10px 0;
-    }
-</style>
-</head>
-<body>
-<h1>Daily Cybersecurity News</h1>
-"""
-
-for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
-    for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
-        email_body += "<div class='article-separator'></div>"  # Bold line between articles
-    email_body += "</ul></div>"
-
-email_body += """
-</body>
-</html>
-"""
-
-# Check if email body is empty
-if not any(categorized_articles.values()):
+def generate_email_body(categorized_articles):
     email_body = """
     <html>
+    <head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; margin-top: 20px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 10px 0; background-color: #f2f2f2; padding: 10px; border-radius: 5px; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .category { margin-top: 30px; }
+        .article-separator { border-top: 1px solid #bdc3c7; margin: 15px 0; }
+    </style>
+    </head>
     <body>
-    <p>Nothing new today. Thanks for checking in with us.</p>
-    </body>
-    </html>
+    <h1>Daily Cybersecurity News Roundup</h1>
     """
 
-# Create email message
-msg = MIMEMultipart()
-msg['From'] = email_from
-msg['To'] = ", ".join(email_to)
-msg['Subject'] = email_subject
-msg.attach(MIMEText(email_body, 'html'))
+    for category, articles in categorized_articles.items():
+        if articles:
+            email_body += f"<div class='category'><h2>{category}</h2><ul>"
+            for article in articles:
+                email_body += f"""
+                <li>
+                    <a href="{article['url']}">{article['title']}</a>
+                </li>
+                <div class='article-separator'></div>
+                """
+            email_body += "</ul></div>"
 
-# Send email
-try:
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(email_from, email_password)
-    text = msg.as_string()
-    server.sendmail(email_from, email_to, text)
-    server.quit()
-    logging.info("Email sent successfully")
-except Exception as e:
-    logging.error(f"Failed to send email: {e}")
+    email_body += "</body></html>"
+    return email_body
 
-# Close the database connection
-conn.close()
+def send_email(body):
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_FROM
+    msg['To'] = ", ".join(EMAIL_TO)
+    msg['Subject'] = EMAIL_SUBJECT
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(EMAIL_FROM, EMAIL_PASSWORD)
+            server.send_message(msg)
+        logging.info("Email sent successfully")
+    except Exception as e:
+        logging.error(f"Failed to send email: {str(e)}")
+
+async def main():
+    articles = await process_websites()
+    categorized_articles = await categorize_articles(articles)
+    email_body = generate_email_body(categorized_articles)
+    send_email(email_body)
+
+def lambda_handler(event, context):
+    asyncio.run(main())
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Cybersecurity news process completed successfully!')
+    }
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+# GitHub Actions workflow (save as .github/workflows/cybersecurity_news.yml)
+"""
+name: Daily Cybersecurity News
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Runs at 8:00 AM UTC daily
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  send-news:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install aiohttp beautifulsoup4
+    - name: Run script
+      env:
+        EMAIL_ADDRESS_GPT: ${{ secrets.EMAIL_ADDRESS_GPT }}
+        EMAIL_PASSWORD_GPT: ${{ secrets.EMAIL_PASSWORD_GPT }}
+        EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      run: python cybersecurity_news_script.py
+"""
+
+# Requirements (save as requirements.txt)
+"""
+aiohttp==3.7.4
+beautifulsoup4==4.9.3
+"""
