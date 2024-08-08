@@ -119,9 +119,24 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Function to summarize an article (placeholder)
-def summarize_article(url):
-    return f"Summary of article from {url}"
+# Function to get article summary
+def get_article_summary(url):
+    try:
+        response = session.get(url, timeout=30)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'lxml')
+        
+        # Try to find the article body
+        article_body = soup.find('article') or soup.find('div', class_='article-body')
+        if article_body:
+            paragraphs = article_body.find_all('p')
+            summary = " ".join([p.get_text().strip() for p in paragraphs[:2]])  # First two paragraphs
+            return summary[:200] + "..." if len(summary) > 200 else summary
+        else:
+            return "Summary not available."
+    except Exception as e:
+        logging.error(f"Failed to get summary for {url}: {e}")
+        return "Failed to retrieve summary."
 
 # Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
@@ -134,16 +149,16 @@ def get_articles(base_url, keywords, processed_urls):
 
         for link in soup.find_all('a', href=True):
             href = link['href']
-            title = link.get_text()
+            title = link.get_text().strip()
 
             href = urljoin(base_url, href)
             if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
-                    summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "summary": summary, "url": href})
+                    summary = get_article_summary(href)
+                    articles.append({"title": title, "summary": summary, "url": href})
                     processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {summary}")
-                    time.sleep(1)  # Rate limiting for requests to the same website
+                    logging.info(f"Found article: {title} - {summary}")
+                    time.sleep(1)  # Rate limiting
 
         return articles
     except Exception as e:
@@ -195,19 +210,36 @@ def get_new_cves():
         logging.error(f"Failed to fetch new CVEs: {e}")
         return []
 
-# Function to fetch cybersecurity regulation updates (placeholder)
+# Function to fetch cybersecurity regulation updates
 def get_regulation_updates():
-    return [
-        {"title": "GDPR: New guidelines on AI and data protection", "url": "https://example.com/gdpr-ai"},
-        {"title": "CCPA: Proposed modifications to regulations", "url": "https://example.com/ccpa-mods"}
-    ]
+    url = "https://www.nist.gov/cyberframework/getting-started/news"
+    updates = []
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'lxml')
+        news_items = soup.find_all('div', class_='views-row')
+        for item in news_items[:5]:  # Get the first 5 news items
+            title = item.find('h3').get_text().strip()
+            link = urljoin(url, item.find('a')['href'])
+            updates.append({"title": title, "url": link})
+        return updates
+    except Exception as e:
+        logging.error(f"Failed to fetch regulation updates: {e}")
+        return [{"title": "Failed to fetch updates", "url": "#"}]
 
-# Function to get geopolitical updates (placeholder)
+# Function to get geopolitical updates
 def get_geopolitical_updates():
-    return [
-        {"title": "Tensions rise in cyberspace between nations A and B", "summary": "Increased cyber activities observed..."},
-        {"title": "New international cybersecurity coalition formed", "summary": "Five countries join forces to..."}
-    ]
+    api_key = os.getenv('NEWS_API_KEY')  # You need to set this in your GitHub secrets
+    url = f"https://newsapi.org/v2/top-headlines?country=us&category=technology&apiKey={api_key}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return [{"title": article['title'], "summary": article['description']} for article in data['articles'][:5]]
+    except Exception as e:
+        logging.error(f"Failed to fetch geopolitical updates: {e}")
+        return [{"title": "Failed to fetch updates", "summary": "Please check back later."}]
 
 # Main execution function
 def main():
@@ -270,45 +302,47 @@ def main():
 
     # Add categorized articles
     for category, articles in categorized_articles.items():
-        email_body += f"<div class='category'><h2>{category}</h2><ul>"
-        for article in articles:
-            email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
-            email_body += "<div class='article-separator'></div>"
-        email_body += "</ul></div>"
+        if articles:  # Only add the category if there are articles
+            email_body += f"<div class='category'><h2>{category}</h2><ul>"
+            for article in articles:
+                email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+                email_body += "<div class='article-separator'></div>"
+            email_body += "</ul></div>"
 
     # Add New CVEs
-    email_body += "<h2>New Critical Vulnerabilities</h2><ul>"
-    for cve in new_cves:
-        email_body += f"<li><strong>{cve['cve']['CVE_data_meta']['ID']}</strong>: {cve['cve']['description']['description_data'][0]['value'][:200]}...</li>"
-    email_body += "</ul>"
+    if new_cves:
+        email_body += "<h2>New Critical Vulnerabilities</h2><ul>"
+        for cve in new_cves:
+            cve_id = cve['cve']['CVE_data_meta']['ID']
+            description = cve['cve']['description']['description_data'][0]['value']
+            email_body += f"<li><strong>{cve_id}</strong>: {description[:200]}...</li>"
+        email_body += "</ul>"
+    else:
+        email_body += "<h2>New Critical Vulnerabilities</h2><p>No new critical vulnerabilities reported today.</p>"
 
     # Add Regulation Updates
-    email_body += "<h2>Regulatory and Compliance Updates</h2><ul>"
-    for update in regulation_updates:
-        email_body += f"<li><a href='{update['url']}'>{update['title']}</a></li>"
-    email_body += "</ul>"
+    if regulation_updates:
+        email_body += "<h2>Regulatory and Compliance Updates</h2><ul>"
+        for update in regulation_updates:
+            email_body += f"<li><a href='{update['url']}'>{update['title']}</a></li>"
+        email_body += "</ul>"
+    else:
+        email_body += "<h2>Regulatory and Compliance Updates</h2><p>No new regulatory updates available today.</p>"
 
     # Add Geopolitical Updates
-    email_body += "<h2>Geopolitical Context</h2><ul>"
-    for update in geopolitical_updates:
-        email_body += f"<li><strong>{update['title']}</strong><br>{update['summary']}</li>"
-    email_body += "</ul>"
+    if geopolitical_updates:
+        email_body += "<h2>Geopolitical Context</h2><ul>"
+        for update in geopolitical_updates:
+            email_body += f"<li><strong>{update['title']}</strong><br>{update['summary']}</li>"
+        email_body += "</ul>"
+    else:
+        email_body += "<h2>Geopolitical Context</h2><p>No significant geopolitical updates related to cybersecurity today.</p>"
 
     email_body += """
     </div>
     </body>
     </html>
     """
-
-    # Check if email body is empty
-    if not any(categorized_articles.values()):
-        email_body = """
-        <html>
-        <body>
-        <p>Nothing new today. Thanks for checking in with us.</p>
-        </body>
-        </html>
-        """
 
     # Create email message
     msg = MIMEMultipart()
