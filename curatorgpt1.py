@@ -11,6 +11,8 @@ import sqlite3
 from urllib.parse import urljoin, urlparse
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+import concurrent.futures
+import sys
 
 # Setup logging
 logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
@@ -36,15 +38,6 @@ keywords = {
     "Compliance": ["compliance", "regulation"],
     "Startup": ["startup", "funding"],
     "AI": ["AI", "artificial intelligence"]
-}
-
-# Example images for categories
-category_images = {
-    "Breach": "https://example.com/breach_image.jpg",
-    "Vulnerability": "https://example.com/vulnerability_image.jpg",
-    "Compliance": "https://example.com/compliance_image.jpg",
-    "Startup": "https://example.com/startup_image.jpg",
-    "AI": "https://example.com/ai_image.jpg"
 }
 
 # Create or connect to a SQLite database
@@ -125,40 +118,37 @@ def should_process_url(url, processed_urls):
 def is_valid_url(url):
     try:
         response = session.head(url, timeout=30)
-        if response.status_code == 404:
-            logging.warning(f"URL {url} returned a 404 error.")
-            return False
-        return True
+        return 200 <= response.status_code < 400
     except requests.RequestException as e:
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Example function to summarize an article
+# Improved summarization function (placeholder for now)
 def summarize_article(url):
-    # Simulate a summarization process (replace with actual API call if available)
-    return f"Summary of {url}"
+    # TODO: Implement actual summarization using NLP techniques or an API
+    return f"Summary of article from {url}"
 
-# Function to get articles from a website
+# Function to get articles from a website with rate limiting
 def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
+    articles = []
     try:
         response = session.get(base_url, timeout=30)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response.raise_for_status()
         soup = BeautifulSoup(response.content, 'lxml')
 
-        articles = []
         for link in soup.find_all('a', href=True):
             href = link['href']
             title = link.get_text()
 
-            # Ensure the URL is absolute using urljoin
             href = urljoin(base_url, href)
             if should_process_url(href, processed_urls) and any(keyword.lower() in title.lower() for keyword in keywords):
                 if is_valid_url(href):
                     summary = summarize_article(href)
-                    articles.append({"title": title.strip(), "url": href, "summary": summary})
+                    articles.append({"title": title.strip(), "summary": summary, "url": href})
                     processed_urls.add(href)
-                    logging.info(f"Found article: {title.strip()} - {href} - {summary}")
+                    logging.info(f"Found article: {title.strip()} - {summary}")
+                    time.sleep(1)  # Rate limiting for requests to the same website
 
         return articles
     except Exception as e:
@@ -178,111 +168,111 @@ def categorize_articles(articles):
 
     return categorized
 
-# Collect articles
-start_date, end_date = get_date_range()
-all_articles = []
-processed_urls = set()
+# Collect articles using multi-threading
+def collect_articles(websites, keywords):
+    start_date, end_date = get_date_range()
+    all_articles = []
+    processed_urls = set()
 
-for name, url in websites.items():
-    if is_website_up(url):
-        time.sleep(30)  # Wait for 30 seconds before processing each website
-        articles = get_articles(url, sum(keywords.values(), []), processed_urls)
-        all_articles.extend(articles)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_url = {executor.submit(get_articles, url, sum(keywords.values(), []), processed_urls): name 
+                         for name, url in websites.items() if is_website_up(url)}
+        for future in concurrent.futures.as_completed(future_to_url):
+            name = future_to_url[future]
+            try:
+                articles = future.result()
+                all_articles.extend(articles)
+            except Exception as exc:
+                logging.error(f'{name} generated an exception: {exc}')
 
-# Categorize articles
-categorized_articles = categorize_articles(all_articles)
+    return all_articles
 
-# Build HTML email body with styles and images
-email_body = """
-<html>
-<head>
-<style>
-    body {
-        font-family: Arial, sans-serif; 
-        line-height: 1.6;
-        background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
-        background-size: cover;  /* Ensure the image covers the entire background */
-    }
-    h2 {
-        color: #2E8B57;
-    }
-    ul {
-        list-style-type: none; 
-        padding: 0;
-    }
-    li {
-        margin: 10px 0;
-    }
-    a {
-        text-decoration: none; 
-        color: #1E90FF;
-    }
-    a:hover {
-        text-decoration: underline;
-    }
-    .summary {
-        font-size: 0.9em; 
-        color: #555;
-    }
-    .category {
-        margin-top: 20px;
-    }
-    .category img {
-        width: 100px; 
-        height: auto; 
-        float: left; 
-        margin-right: 20px;
-    }
-    .article-separator {
-        border-top: 2px solid #000; 
-        margin: 10px 0;
-    }
-</style>
-</head>
-<body>
-<h1>Daily Cybersecurity News</h1>
-"""
+# Main execution function
+def main():
+    all_articles = collect_articles(websites, keywords)
+    categorized_articles = categorize_articles(all_articles)
 
-for category, articles in categorized_articles.items():
-    email_body += f"<div class='category'><img src='{category_images.get(category, '')}' alt='{category} Image'><h2>{category}</h2><ul>"
-    for article in articles:
-        email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
-        email_body += "<div class='article-separator'></div>"  # Bold line between articles
-    email_body += "</ul></div>"
-
-email_body += """
-</body>
-</html>
-"""
-
-# Check if email body is empty
-if not any(categorized_articles.values()):
+    # Build HTML email body with styles
     email_body = """
     <html>
+    <head>
+    <style>
+        body {
+            font-family: Arial, sans-serif; 
+            line-height: 1.6;
+            background-image: url('https://cybertyger.s3.amazonaws.com/CyberTyger1.jpeg');
+            background-size: cover;
+        }
+        h2 {
+            color: #2E8B57;
+        }
+        ul {
+            list-style-type: none; 
+            padding: 0;
+        }
+        li {
+            margin: 10px 0;
+        }
+        .summary {
+            font-size: 0.9em; 
+            color: #555;
+        }
+        .category {
+            margin-top: 20px;
+        }
+        .article-separator {
+            border-top: 2px solid #000; 
+            margin: 10px 0;
+        }
+    </style>
+    </head>
     <body>
-    <p>Nothing new today. Thanks for checking in with us.</p>
+    <h1>Daily Cybersecurity News</h1>
+    """
+
+    for category, articles in categorized_articles.items():
+        email_body += f"<div class='category'><h2>{category}</h2><ul>"
+        for article in articles:
+            email_body += f"<li><a href='{article['url']}'>{article['title']}</a><div class='summary'>{article['summary']}</div></li>"
+            email_body += "<div class='article-separator'></div>"
+        email_body += "</ul></div>"
+
+    email_body += """
     </body>
     </html>
     """
 
-# Create email message
-msg = MIMEMultipart()
-msg['From'] = email_from
-msg['To'] = ", ".join(email_to)
-msg['Subject'] = email_subject
-msg.attach(MIMEText(email_body, 'html'))
+    # Check if email body is empty
+    if not any(categorized_articles.values()):
+        email_body = """
+        <html>
+        <body>
+        <p>Nothing new today. Thanks for checking in with us.</p>
+        </body>
+        </html>
+        """
 
-# Send email
-try:
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(email_from, email_password)
-    text = msg.as_string()
-    server.sendmail(email_from, email_to, text)
-    server.quit()
-    logging.info("Email sent successfully")
-except Exception as e:
-    logging.error(f"Failed to send email: {e}")
+    # Create email message
+    msg = MIMEMultipart()
+    msg['From'] = email_from
+    msg['To'] = ", ".join(email_to)
+    msg['Subject'] = email_subject
+    msg.attach(MIMEText(email_body, 'html'))
 
-# Close the database connection
-conn.close()
+    # Send email
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(email_from, email_password)
+        text = msg.as_string()
+        server.sendmail(email_from, email_to, text)
+        server.quit()
+        logging.info("Email sent successfully")
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
+
+    # Close the database connection
+    conn.close()
+
+if __name__ == "__main__":
+    main()
