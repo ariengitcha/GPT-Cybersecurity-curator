@@ -12,9 +12,6 @@ from urllib.parse import urljoin, urlparse
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import concurrent.futures
-import sys
-import json
-from pytz import timezone
 
 # Setup logging
 logging.basicConfig(filename='curatorgpt.log', level=logging.INFO, 
@@ -104,21 +101,16 @@ def should_process_url(url, processed_urls):
     parsed_url = urlparse(url)
     path = parsed_url.path
 
-    # Check if URL has already been processed
     if url in processed_urls:
         return False
-
-    # Check for /author/ in the URL
     if '/author/' in path:
         return False
-
-    # Check if it's a category URL (you may need to adjust this based on the specific website structures)
     if any(keyword in path for keyword in ['category', 'topics', 'section']):
         return False
 
     return True
 
-# Function to check if a URL returns a 404 error
+# Function to check if a URL is valid
 def is_valid_url(url):
     try:
         response = session.head(url, timeout=30)
@@ -127,12 +119,11 @@ def is_valid_url(url):
         logging.error(f"Failed to check URL {url}: {e}")
         return False
 
-# Improved summarization function (placeholder for now)
+# Function to summarize an article (placeholder)
 def summarize_article(url):
-    # TODO: Implement actual summarization using NLP techniques or an API
     return f"Summary of article from {url}"
 
-# Function to get articles from a website with rate limiting
+# Function to get articles from a website
 def get_articles(base_url, keywords, processed_urls):
     logging.info(f"Accessing URL: {base_url}")
     articles = []
@@ -174,7 +165,6 @@ def categorize_articles(articles):
 
 # Collect articles using multi-threading
 def collect_articles(websites, keywords):
-    start_date, end_date = get_date_range()
     all_articles = []
     processed_urls = set()
 
@@ -191,21 +181,6 @@ def collect_articles(websites, keywords):
 
     return all_articles
 
-# Function to fetch threat intelligence from AlienVault OTX
-def get_alienvault_intel():
-    api_key = os.getenv('ALIENVAULT_API_KEY')
-    url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
-    headers = {"X-OTX-API-KEY": api_key}
-    
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        return data['results'][:5]  # Return the 5 most recent pulses
-    except Exception as e:
-        logging.error(f"Failed to fetch AlienVault intel: {e}")
-        return []
-
 # Function to fetch new CVEs from NVD
 def get_new_cves():
     two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%S:000 UTC-00:00")
@@ -220,31 +195,18 @@ def get_new_cves():
         logging.error(f"Failed to fetch new CVEs: {e}")
         return []
 
-# Function to fetch cybersecurity regulation updates
+# Function to fetch cybersecurity regulation updates (placeholder)
 def get_regulation_updates():
-    # This is a placeholder. In a real-world scenario, you'd integrate with 
-    # a service that provides regulatory updates.
     return [
         {"title": "GDPR: New guidelines on AI and data protection", "url": "https://example.com/gdpr-ai"},
         {"title": "CCPA: Proposed modifications to regulations", "url": "https://example.com/ccpa-mods"}
     ]
 
-# Function to get geopolitical updates
+# Function to get geopolitical updates (placeholder)
 def get_geopolitical_updates():
-    # This is a placeholder. In a real-world scenario, you'd integrate with 
-    # a geopolitical news API or use web scraping.
     return [
         {"title": "Tensions rise in cyberspace between nations A and B", "summary": "Increased cyber activities observed..."},
         {"title": "New international cybersecurity coalition formed", "summary": "Five countries join forces to..."}
-    ]
-
-# Function to get upcoming cybersecurity events and training
-def get_upcoming_events():
-    # This is a placeholder. In a real-world scenario, you'd integrate with 
-    # an events API or maintain your own database of upcoming events.
-    return [
-        {"title": "Advanced Threat Hunting Webinar", "date": "2023-06-15", "url": "https://example.com/webinar"},
-        {"title": "Annual Cybersecurity Conference", "date": "2023-07-01", "url": "https://example.com/conference"}
     ]
 
 # Main execution function
@@ -252,11 +214,9 @@ def main():
     all_articles = collect_articles(websites, keywords)
     categorized_articles = categorize_articles(all_articles)
     
-    threat_intel = get_alienvault_intel()
     new_cves = get_new_cves()
     regulation_updates = get_regulation_updates()
     geopolitical_updates = get_geopolitical_updates()
-    upcoming_events = get_upcoming_events()
 
     # Build HTML email body with styles
     email_body = """
@@ -316,12 +276,6 @@ def main():
             email_body += "<div class='article-separator'></div>"
         email_body += "</ul></div>"
 
-    # Add Threat Intelligence
-    email_body += "<h2>Threat Intelligence</h2><ul>"
-    for pulse in threat_intel:
-        email_body += f"<li><strong>{pulse['name']}</strong><br>{pulse['description'][:200]}...</li>"
-    email_body += "</ul>"
-
     # Add New CVEs
     email_body += "<h2>New Critical Vulnerabilities</h2><ul>"
     for cve in new_cves:
@@ -340,17 +294,21 @@ def main():
         email_body += f"<li><strong>{update['title']}</strong><br>{update['summary']}</li>"
     email_body += "</ul>"
 
-    # Add Upcoming Events
-    email_body += "<h2>Upcoming Events and Training</h2><ul>"
-    for event in upcoming_events:
-        email_body += f"<li><strong>{event['title']}</strong> - {event['date']}<br><a href='{event['url']}'>More Info</a></li>"
-    email_body += "</ul>"
-
     email_body += """
     </div>
     </body>
     </html>
     """
+
+    # Check if email body is empty
+    if not any(categorized_articles.values()):
+        email_body = """
+        <html>
+        <body>
+        <p>Nothing new today. Thanks for checking in with us.</p>
+        </body>
+        </html>
+        """
 
     # Create email message
     msg = MIMEMultipart()
@@ -372,3 +330,7 @@ def main():
         logging.error(f"Failed to send email: {e}")
 
     # Close the database connection
+    conn.close()
+
+if __name__ == "__main__":
+    main()
